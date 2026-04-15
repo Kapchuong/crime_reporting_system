@@ -1,0 +1,30 @@
+{
+  "name": "crime-reporting-system",
+  "version": "1.0.0",
+  "description": "Kiryandongo Community Crime Reporting System with Netlify Functions",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 5500",
+    "dev": "npx http-server -p 5500",
+    "deploy": "netlify deploy --prod",
+    "build": "echo 'No build step required'"
+  },
+  "keywords": [
+    "crime-reporting",
+    "emergency",
+    "security",
+    "netlify",
+    "firebase"
+  ],
+  "author": "Kiryandongo Security",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
