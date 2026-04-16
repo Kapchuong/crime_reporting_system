@@ -1,3 +1,4 @@
+// Functon to send notifications to police contacts when a new crime report is created
 export async function onRequest(context) {
     console.log('=== FUNCTION STARTED ===');
     
