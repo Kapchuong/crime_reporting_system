@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Crime Reporting System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+
+    <!-- Firebase SDK  -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <script src="../js/firebase-config.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        
+        .auth-container { width: 100%; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: white; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 600px; padding: 2.5rem; }
+        .auth-header { text-align: center; margin-bottom: 2rem; }
+        .auth-header i { font-size: 3rem; color: #dc3545; margin-bottom: 1rem; }
+        .auth-header h2 { color: #1e3c72; margin-bottom: 0.5rem; }
+        .auth-header p { color: #6c757d; }
+        
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: #2c3e50; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 1rem; transition: all 0.3s; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #1e3c72; }
+        
+        .password-strength { margin-top: 5px; height: 5px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+        .password-strength-bar { height: 100%; width: 0; transition: width 0.3s ease; }
+        .strength-weak { background: #dc3545; width: 33.33%; }
+        .strength-medium { background: #ff9800; width: 66.66%; }
+        .strength-strong { background: #4caf50; width: 100%; }
+        .password-requirements { font-size: 0.8rem; color: #666; margin-top: 5px; }
+        .requirement-met { color: #4caf50; }
+        .requirement-unmet { color: #dc3545; }
+        
+        .police-only { display: none; }
+        .admin-only { display: none; }
+        
+        .terms { margin-bottom: 1.5rem; }
+        .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        
+        .btn-auth { width: 100%; padding: 1rem; background: #1e3c72; color: white; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; }
+        .btn-auth:hover { background: #2a5298; }
+        .btn-auth:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .auth-footer { text-align: center; margin-top: 1.5rem; color: #6c757d; }
+        .auth-footer a { color: #1e3c72; text-decoration: none; font-weight: 600; }
+        .error-message { background: #f8d7da; color: #721c24; padding: 0.75rem; border-radius: 5px; margin-top: 1rem; text-align: center; display: none; }
+        .warning-message { background: #fff3cd; color: #856404; padding: 0.75rem; border-radius: 5px; margin-top: 1rem; text-align: center; display: none; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 10px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; background: #f8f9fa; border-radius: 10px 10px 0 0; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; background: #f8f9fa; border-radius: 0 0 10px 10px; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        
+        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <i class="fas fa-shield-alt"></i>
+                <h2>Create Account</h2>
+                <p>Join the community safety network</p>
+            </div>
+            
+            <form id="registerForm" class="auth-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" required placeholder="Enter your full name">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" required placeholder="Enter your email">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone">Phone Number *</label>
+                        <input type="tel" id="phone" required placeholder="Enter your phone number">
+                    </div>
+                    <div class="form-group">
+                        <label for="location">Location/Village *</label>
+                        <input type="text" id="location" required placeholder="Enter your location">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <input type="password" id="password" required placeholder="Create a password" oninput="checkPasswordStrength()">
+                        <div class="password-strength">
+                            <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                        </div>
+                        <div class="password-requirements" id="passwordRequirements">
+                            <div id="reqLength">✗ At least 6 characters</div>
+                            <div id="reqUpper">✗ At least 1 uppercase letter</div>
+                            <div id="reqLower">✗ At least 1 lowercase letter</div>
+                            <div id="reqNumber">✗ At least 1 number</div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password *</label>
+                        <input type="password" id="confirmPassword" required placeholder="Confirm your password" oninput="checkPasswordMatch()">
+                        <div id="passwordMatch" style="font-size: 0.8rem; margin-top: 5px;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Register as *</label>
+                    <select id="role" required onchange="toggleRoleFields()">
+                        <option value="">Select Role</option>
+                        <option value="citizen">Citizen</option>
+                        <option value="police">Police Officer</option>
+                        <option value="admin">System Administrator</option>
+                    </select>
+                </div>
+                
+                <!-- Police-specific fields -->
+                <div id="policeFields" class="police-only">
+                    <div class="form-group">
+                        <label for="badgeNumber">Badge Number *</label>
+                        <input type="text" id="badgeNumber" placeholder="Enter your police badge number">
+                    </div>
+                    <div class="form-group">
+                        <label for="policeStation">Police Station *</label>
+                        <input type="text" id="policeStation" placeholder="Enter your assigned police station">
+                    </div>
+                    <div class="form-group">
+                        <label for="rank">Rank *</label>
+                        <select id="rank">
+                            <option value="">Select Rank</option>
+                            <option value="Constable">Constable</option>
+                            <option value="Sergeant">Sergeant</option>
+                            <option value="Inspector">Inspector</option>
+                            <option value="Assistant Superintendent">Assistant Superintendent</option>
+                            <option value="Superintendent">Superintendent</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Admin-specific fields -->
+                <div id="adminFields" class="admin-only">
+                    <div class="form-group">
+                        <label for="adminCode">Admin Registration Code *</label>
+                        <input type="password" id="adminCode" placeholder="Enter admin registration code">
+                        <small style="color: #666;">Contact system administrator for the code</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <input type="text" id="department" placeholder="Enter your department">
+                    </div>
+                </div>
+                
+                <div class="terms">
+                    <label for="terms" class="checkbox-container">
+                        <input type="checkbox" id="terms" required>
+                        <span class="checkmark"></span>
+                        I agree to the <a href="#" onclick="showTermsModal(); return false;">Terms of Service</a> and <a href="#" onclick="showPrivacyModal(); return false;">Privacy Policy</a>
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn-auth" id="registerBtn">
+                    <i class="fas fa-user-plus"></i>
+                    Register
+                </button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="login.html">Login here</a></p>
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+            <div id="warningMessage" class="warning-message"></div>
+        </div>
+    </div>
+    
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Terms of Service</h3>
+                <button class="modal-close" onclick="closeTermsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4>1. Acceptance of Terms</h4>
+                <p>By accessing and using this crime reporting system, you agree to be bound by these Terms of Service.</p>
+                <h4>2. User Responsibilities</h4>
+                <p>You agree to provide accurate information when reporting incidents. False reports may result in legal consequences.</p>
+                <h4>3. Privacy</h4>
+                <p>Your personal information will be handled in accordance with our Privacy Policy.</p>
+                <h4>4. Emergency Reporting</h4>
+                <p>For life-threatening emergencies, always call emergency services directly (999).</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closeTermsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Privacy Modal -->
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Privacy Policy</h3>
+                <button class="modal-close" onclick="closePrivacyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4>Information We Collect</h4>
+                <p>We collect personal information you provide, including name, email, phone number, and location.</p>
+                <h4>How We Use Information</h4>
+                <p>Your information is used to process reports and coordinate emergency responses.</p>
+                <h4>Information Sharing</h4>
+                <p>We share relevant information with law enforcement agencies to respond to reported incidents.</p>
+                <h4>Your Rights</h4>
+                <p>You have the right to access, correct, or delete your personal information.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closePrivacyModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Toggle role-specific fields
+        function toggleRoleFields() {
+            const role = document.getElementById('role').value;
+            const policeFields = document.getElementById('policeFields');
+            const adminFields = document.getElementById('adminFields');
+            
+            policeFields.style.display = 'none';
+            adminFields.style.display = 'none';
+            
+            if (role === 'police') {
+                policeFields.style.display = 'block';
+                document.getElementById('badgeNumber').required = true;
+                document.getElementById('policeStation').required = true;
+                document.getElementById('rank').required = true;
+            } else {
+                document.getElementById('badgeNumber').required = false;
+                document.getElementById('policeStation').required = false;
+                document.getElementById('rank').required = false;
+            }
+            
+            if (role === 'admin') {
+                adminFields.style.display = 'block';
+                document.getElementById('adminCode').required = true;
+                document.getElementById('department').required = true;
+            } else {
+                document.getElementById('adminCode').required = false;
+                document.getElementById('department').required = false;
+            }
+        }
+        
+        // Password strength checker
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const requirements = {
+                length: password.length >= 6,
+                upper: /[A-Z]/.test(password),
+                lower: /[a-z]/.test(password),
+                number: /[0-9]/.test(password)
+            };
+            
+            document.getElementById('reqLength').innerHTML = (requirements.length ? '✓' : '✗') + ' At least 6 characters';
+            document.getElementById('reqLength').className = requirements.length ? 'requirement-met' : 'requirement-unmet';
+            document.getElementById('reqUpper').innerHTML = (requirements.upper ? '✓' : '✗') + ' At least 1 uppercase letter';
+            document.getElementById('reqUpper').className = requirements.upper ? 'requirement-met' : 'requirement-unmet';
+            document.getElementById('reqLower').innerHTML = (requirements.lower ? '✓' : '✗') + ' At least 1 lowercase letter';
+            document.getElementById('reqLower').className = requirements.lower ? 'requirement-met' : 'requirement-unmet';
+            document.getElementById('reqNumber').innerHTML = (requirements.number ? '✓' : '✗') + ' At least 1 number';
+            document.getElementById('reqNumber').className = requirements.number ? 'requirement-met' : 'requirement-unmet';
+            
+            const strengthBar = document.getElementById('passwordStrengthBar');
+            const metCount = Object.values(requirements).filter(Boolean).length;
+            strengthBar.className = 'password-strength-bar';
+            if (metCount <= 2) strengthBar.classList.add('strength-weak');
+            else if (metCount <= 3) strengthBar.classList.add('strength-medium');
+            else strengthBar.classList.add('strength-strong');
+        }
+        
+        function checkPasswordMatch() {
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const matchDiv = document.getElementById('passwordMatch');
+            if (confirm.length === 0) matchDiv.innerHTML = '';
+            else if (password === confirm) { matchDiv.innerHTML = '✓ Passwords match'; matchDiv.style.color = '#4caf50'; }
+            else { matchDiv.innerHTML = '✗ Passwords do not match'; matchDiv.style.color = '#dc3545'; }
+        }
+        
+        function showTermsModal() { document.getElementById('termsModal').style.display = 'flex'; }
+        function closeTermsModal() { document.getElementById('termsModal').style.display = 'none'; }
+        function showPrivacyModal() { document.getElementById('privacyModal').style.display = 'flex'; }
+        function closePrivacyModal() { document.getElementById('privacyModal').style.display = 'none'; }
+        
+        // Admin registration code (in production, this should be stored securely)
+        const ADMIN_REGISTRATION_CODE = 'KIRYANDONGO_ADMIN_2026';
+        
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            const location = document.getElementById('location').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const role = document.getElementById('role').value;
+            const terms = document.getElementById('terms').checked;
+            
+            const errorDiv = document.getElementById('errorMessage');
+            const warningDiv = document.getElementById('warningMessage');
+            errorDiv.style.display = 'none';
+            warningDiv.style.display = 'none';
+            
+            // Validation
+            if (!fullName || !email || !phone || !location || !role) {
+                errorDiv.textContent = 'Please fill in all required fields';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (!terms) {
+                errorDiv.textContent = 'You must accept the terms and conditions';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Police-specific validation
+            if (role === 'police') {
+                const badgeNumber = document.getElementById('badgeNumber').value;
+                const policeStation = document.getElementById('policeStation').value;
+                const rank = document.getElementById('rank').value;
+                if (!badgeNumber || !policeStation || !rank) {
+                    errorDiv.textContent = 'Please fill in all police officer details';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+            
+            // Admin-specific validation
+            if (role === 'admin') {
+                const adminCode = document.getElementById('adminCode').value;
+                const department = document.getElementById('department').value;
+                if (!adminCode || !department) {
+                    errorDiv.textContent = 'Please fill in all administrator details';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                if (adminCode !== ADMIN_REGISTRATION_CODE) {
+                    errorDiv.textContent = 'Invalid admin registration code. Please contact the system administrator.';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+            
+            const registerBtn = document.getElementById('registerBtn');
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+            
+            try {
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                await user.updateProfile({ displayName: fullName });
+                
+                const userData = {
+                    uid: user.uid,
+                    fullName: fullName,
+                    email: email,
+                    phone: phone,
+                    location: location,
+                    role: role,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                    isActive: true
+                };
+                
+                // Add role-specific fields
+                if (role === 'police') {
+                    userData.badgeNumber = document.getElementById('badgeNumber').value;
+                    userData.policeStation = document.getElementById('policeStation').value;
+                    userData.rank = document.getElementById('rank').value;
+                }
+                
+                if (role === 'admin') {
+                    userData.department = document.getElementById('department').value;
+                    userData.isSuperAdmin = true;
+                }
+                
+                await firebase.firestore().collection('users').doc(user.uid).set(userData);
+                await user.sendEmailVerification();
+                
+                // Show success message based on role
+                let successMessage = 'Registration successful! Please check your email to verify your account.';
+                if (role === 'police') {
+                    successMessage = 'Police registration successful! Your account will be activated by an administrator. You will receive an email once approved.';
+                } else if (role === 'admin') {
+                    successMessage = 'Administrator registration successful! You now have full system access.';
+                }
+                
+                alert(successMessage);
+                window.location.href = 'login.html';
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                let errorMessage = 'An error occurred. Please try again.';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'This email is already registered. Please use a different email.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'Password is too weak. Please use a stronger password.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Please enter a valid email address.';
+                }
+                errorDiv.textContent = errorMessage;
+                errorDiv.style.display = 'block';
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register';
+            }
+        });
+        
+        window.onclick = function(event) { 
+            if (event.target.classList.contains('modal')) event.target.style.display = 'none'; 
+        };
+    </script>
+</body>
+</html>
