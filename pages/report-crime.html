@@ -270,10 +270,12 @@
         let currentUser = null;
         let selectedFiles = [];
         
-        // ============ NEW: Function to call Netlify for notifications ============
-        async function sendNotificationsViaNetlify(reportId, reportData) {
+        // ============ UPDATED: Function to call Cloudflare for notifications ============
+        async function sendNotificationsViaCloudflare(reportId, reportData) {
             try {
-                console.log('📡 Calling Netlify function to send notifications...');
+                // Define your Cloudflare Pages function URL
+                const cloudflareUrl = 'https://crime-reporting-system.pages.dev/sendNotification';
+                console.log(`📡 Calling Cloudflare function at: ${cloudflareUrl}`);
                 
                 // Get all police contacts from Firestore
                 const policeSnapshot = await db.collection('users').where('role', '==', 'police').get();
@@ -293,12 +295,9 @@
                     return;
                 }
                 
-                console.log(`📋 Notifying ${policeContacts.length} police officers via Netlify`);
+                console.log(`📋 Notifying ${policeContacts.length} police officers via Cloudflare`);
                 
-                // Call Netlify function (adjust URL based on your Netlify site)
-                const netlifyUrl = '/.netlify/functions/sendNotification';
-                
-                const response = await fetch(netlifyUrl, {
+                const response = await fetch(cloudflareUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -314,16 +313,16 @@
                 });
                 
                 const result = await response.json();
-                console.log('📧 Netlify notification result:', result);
+                console.log('📧 Cloudflare notification result:', result);
                 
                 if (result.success) {
-                    console.log('✅ Notifications sent successfully via Netlify');
+                    console.log('✅ Notifications sent successfully via Cloudflare');
                 } else {
-                    console.warn('⚠️ Netlify notifications had issues:', result);
+                    console.warn('⚠️ Cloudflare notifications had issues:', result);
                 }
                 
             } catch (error) {
-                console.error('❌ Error calling Netlify function:', error);
+                console.error('❌ Error calling Cloudflare function:', error);
                 // Don't throw - notifications are nice-to-have but not critical
             }
         }
@@ -573,8 +572,8 @@
                     const reportId = docRef.id;
                     console.log('Report saved with ID:', reportId);
                     
-                    // ============ NEW: Send notifications via Netlify ============
-                    await sendNotificationsViaNetlify(reportId, reportData);
+                    // ============ Send notifications via Cloudflare ============
+                    await sendNotificationsViaCloudflare(reportId, reportData);
                     
                     showToast(`Report submitted successfully!\nReference: ${reportId.slice(0, 8).toUpperCase()}` + 
                         (uploadErrors.length > 0 ? `\n\n⚠️ ${uploadErrors.length} file(s) failed to upload due to CORS issues.` : ''), 
