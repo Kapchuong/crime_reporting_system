@@ -63,33 +63,33 @@ export async function handler(event) {
         }
         
         // ============ SEND SMS via TextBee (HIGH PRIORITY ONLY) ============
-        for (const police of policeContacts) {
-            if (priority === 'high' && police.phone && TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) {
-                try {
-                    console.log(`Sending SMS to ${police.phone}...`);
-                    const smsResponse = await fetch('https://api.textbee.dev/api/send', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-API-Key': TEXTBEE_API_KEY
-                        },
-                        body: JSON.stringify({
-                            to: police.phone,
-                            message: `🚨 URGENT: ${incidentType} at ${location}. Report ID: ${reportId.slice(0,8)}. Login to dashboard now.`,
-                            device_id: TEXTBEE_DEVICE_ID
-                        })
-                    });
+        // for (const police of policeContacts) {
+        //     if (priority === 'high' && police.phone && TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) {
+        //         try {
+        //             console.log(`Sending SMS to ${police.phone}...`);
+        //             const smsResponse = await fetch('https://api.textbee.dev/api/send', {
+        //                 method: 'POST',
+        //                 headers: {
+        //                     'Content-Type': 'application/json',
+        //                     'X-API-Key': TEXTBEE_API_KEY
+        //                 },
+        //                 body: JSON.stringify({
+        //                     to: police.phone,
+        //                     message: `🚨 URGENT: ${incidentType} at ${location}. Report ID: ${reportId.slice(0,8)}. Login to dashboard now.`,
+        //                     device_id: TEXTBEE_DEVICE_ID
+        //                 })
+        //             });
                     
-                    const smsResult = await smsResponse.json();
-                    console.log(`SMS result:`, smsResult);
-                    results.push({ type: 'sms', to: police.phone, status: smsResult.success ? 'sent' : 'failed', response: smsResult });
+        //             const smsResult = await smsResponse.json();
+        //             console.log(`SMS result:`, smsResult);
+        //             results.push({ type: 'sms', to: police.phone, status: smsResult.success ? 'sent' : 'failed', response: smsResult });
                     
-                } catch (error) {
-                    console.error(`SMS error:`, error.message);
-                    results.push({ type: 'sms', to: police.phone, status: 'failed', error: error.message });
-                }
-            }
-        }
+        //         } catch (error) {
+        //             console.error(`SMS error:`, error.message);
+        //             results.push({ type: 'sms', to: police.phone, status: 'failed', error: error.message });
+        //         }
+        //     }
+        // }
         
         return {
             statusCode: 200,
