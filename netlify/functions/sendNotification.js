@@ -1,7 +1,9 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event) => {
-    // Only allow POST requests
+    console.log('=== FUNCTION CALLED ===');
+    console.log('HTTP Method:', event.httpMethod);
+    
     if (event.httpMethod !== 'POST') {
         return { 
             statusCode: 405, 
@@ -10,22 +12,27 @@ exports.handler = async (event) => {
     }
 
     try {
-        const { reportId, incidentType, location, priority, description, policeContacts } = JSON.parse(event.body);
+        const body = JSON.parse(event.body);
+        console.log('Received body:', JSON.stringify(body, null, 2));
         
-        console.log(`📋 Sending notifications for report: ${reportId}`);
-        console.log(`📊 Report: ${incidentType} at ${location} (${priority} priority)`);
+        const { reportId, incidentType, location, priority, description, policeContacts } = body;
+        
+        // Log environment variables (check if they exist)
+        console.log('PLUNK_API_KEY exists:', !!process.env.PLUNK_API_KEY);
+        console.log('TEXTBEE_API_KEY exists:', !!process.env.TEXTBEE_API_KEY);
+        console.log('TEXTBEE_DEVICE_ID exists:', !!process.env.TEXTBEE_DEVICE_ID);
         
         const results = [];
         
-        // Get API keys from environment variables (set in Netlify dashboard)
         const PLUNK_API_KEY = process.env.PLUNK_API_KEY;
         const TEXTBEE_API_KEY = process.env.TEXTBEE_API_KEY;
         const TEXTBEE_DEVICE_ID = process.env.TEXTBEE_DEVICE_ID;
         
-        // Send EMAILS via Plunk to ALL police
+        // ============ SEND EMAILS via Plunk ============
         for (const police of policeContacts) {
             if (police.email && PLUNK_API_KEY) {
                 try {
+                    console.log(`Sending email to ${police.email}...`);
                     const emailResponse = await fetch('https://api.useplunk.com/v1/send', {
                         method: 'POST',
                         headers: {
@@ -35,31 +42,26 @@ exports.handler = async (event) => {
                         body: JSON.stringify({
                             to: police.email,
                             subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
-                            body: `
-                                <h3>New ${priority.toUpperCase()} Priority Report</h3>
-                                <p><strong>Report ID:</strong> ${reportId}</p>
-                                <p><strong>Incident Type:</strong> ${incidentType}</p>
-                                <p><strong>Location:</strong> ${location}</p>
-                                <p><strong>Description:</strong> ${description || 'No description provided'}</p>
-                                <hr>
-                                <p>Please login to the police dashboard for more details.</p>
-                            `
+                            body: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
                         })
                     });
                     
                     const emailResult = await emailResponse.json();
-                    console.log(`📧 Email sent to ${police.email}:`, emailResult.success ? 'SUCCESS' : 'FAILED');
-                    results.push({ type: 'email', to: police.email, status: emailResult.success ? 'sent' : 'failed' });
+                    console.log(`Email result:`, emailResult);
+                    results.push({ type: 'email', to: police.email, status: emailResult.success ? 'sent' : 'failed', response: emailResult });
                     
                 } catch (error) {
-                    console.error(`❌ Email failed to ${police.email}:`, error.message);
+                    console.error(`Email error:`, error.message);
                     results.push({ type: 'email', to: police.email, status: 'failed', error: error.message });
                 }
             }
-            
-            // Send SMS via TextBee for HIGH PRIORITY only
+        }
+        
+        // ============ SEND SMS via TextBee (HIGH PRIORITY ONLY) ============
+        for (const police of policeContacts) {
             if (priority === 'high' && police.phone && TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) {
                 try {
+                    console.log(`Sending SMS to ${police.phone}...`);
                     const smsResponse = await fetch('https://api.textbee.dev/api/send', {
                         method: 'POST',
                         headers: {
@@ -74,11 +76,11 @@ exports.handler = async (event) => {
                     });
                     
                     const smsResult = await smsResponse.json();
-                    console.log(`📱 SMS sent to ${police.phone}:`, smsResult.success ? 'SUCCESS' : 'FAILED');
-                    results.push({ type: 'sms', to: police.phone, status: smsResult.success ? 'sent' : 'failed' });
+                    console.log(`SMS result:`, smsResult);
+                    results.push({ type: 'sms', to: police.phone, status: smsResult.success ? 'sent' : 'failed', response: smsResult });
                     
                 } catch (error) {
-                    console.error(`❌ SMS failed to ${police.phone}:`, error.message);
+                    console.error(`SMS error:`, error.message);
                     results.push({ type: 'sms', to: police.phone, status: 'failed', error: error.message });
                 }
             }
@@ -88,7 +90,7 @@ exports.handler = async (event) => {
             statusCode: 200,
             body: JSON.stringify({ 
                 success: true, 
-                results,
+                results, 
                 summary: {
                     emailsSent: results.filter(r => r.type === 'email' && r.status === 'sent').length,
                     smsSent: results.filter(r => r.type === 'sms' && r.status === 'sent').length
@@ -97,13 +99,10 @@ exports.handler = async (event) => {
         };
         
     } catch (error) {
-        console.error('❌ Function error:', error);
+        console.error('Function error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ 
-                success: false, 
-                error: error.message 
-            })
+            body: JSON.stringify({ success: false, error: error.message })
         };
     }
 };
