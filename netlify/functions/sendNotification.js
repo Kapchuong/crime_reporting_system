@@ -1,3 +1,7 @@
+console.log('=== STARTING NOTIFICATION FUNCTION ===');
+console.log('PLUNK_API_KEY starts with:', process.env.PLUNK_API_KEY ? process.env.PLUNK_API_KEY.substring(0, 5) : 'NOT SET');
+console.log('TEXTBEE_API_KEY exists:', !!process.env.TEXTBEE_API_KEY);
+console.log('TEXTBEE_DEVICE_ID exists:', !!process.env.TEXTBEE_DEVICE_ID);
 const fetch = require('node-fetch');
 
 exports.handler = async (event) => {
