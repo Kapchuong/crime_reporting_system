@@ -22,27 +22,41 @@ export async function onRequest(context) {
         const { reportId, incidentType, location, priority, description, policeContacts } = body;
         
         const results = [];
-        const DOMAIN = context.env.DOMAIN || 'kapchuong.dpdns.org';
+        const RESEND_API_KEY = context.env.RESEND_API_KEY;
+
+        // Check if API key is configured
+        if (!RESEND_API_KEY) {
+            console.error('❌ RESEND_API_KEY environment variable is not set');
+            return new Response(JSON.stringify({ 
+                success: false, 
+                error: 'RESEND_API_KEY not configured' 
+            }), { 
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
         for (const police of policeContacts) {
             if (police.email) {
                 console.log(`Sending email to ${police.email}...`);
                 
-                const emailRequest = new Request('https://api.mailchannels.net/tx/v1/send', {
+                const resendResponse = await fetch('https://api.resend.com/emails', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `Bearer ${RESEND_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
-                        personalizations: [{ to: [{ email: police.email }] }],
-                        from: { email: `noreply@${DOMAIN}`, name: 'Crime Alert System' },
+                        from: 'Crime Alert System <onboarding@resend.dev>',
+                        to: [police.email],
                         subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
-                        content: [{ type: 'text/plain', value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}` }]
+                        text: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
                     })
                 });
                 
-                const emailResponse = await fetch(emailRequest);
-                const responseText = await emailResponse.text();
+                const responseText = await resendResponse.text();
                 
-                if (emailResponse.ok) {
+                if (resendResponse.ok) {
                     results.push({ type: 'email', to: police.email, status: 'sent' });
                     console.log(`✅ Email sent to ${police.email}`);
                 } else {
