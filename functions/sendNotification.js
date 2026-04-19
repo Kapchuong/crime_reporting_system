@@ -20,13 +20,14 @@ export async function onRequest(context) {
     try {
         const body = await context.request.json();
         const { reportId, incidentType, location, priority, description, policeContacts } = body;
+        
         const results = [];
-        const DOMAIN = context.env.DOMAIN;
+        const DOMAIN = context.env.DOMAIN || 'kapchuong.dpdns.org';
 
         for (const police of policeContacts) {
             if (police.email) {
                 console.log(`Sending email to ${police.email}...`);
-
+                
                 const emailRequest = new Request('https://api.mailchannels.net/tx/v1/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -37,35 +38,36 @@ export async function onRequest(context) {
                         content: [{ type: 'text/plain', value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}` }]
                     })
                 });
-
+                
                 const emailResponse = await fetch(emailRequest);
+                const responseText = await emailResponse.text();
+                
                 if (emailResponse.ok) {
                     results.push({ type: 'email', to: police.email, status: 'sent' });
                     console.log(`✅ Email sent to ${police.email}`);
                 } else {
-                    const errorText = await emailResponse.text();
-                    console.error(`❌ Email failed to ${police.email}: ${errorText}`);
-                    results.push({ type: 'email', to: police.email, status: 'failed', error: errorText });
+                    console.error(`❌ Email failed to ${police.email}: ${responseText}`);
+                    results.push({ type: 'email', to: police.email, status: 'failed', error: responseText });
                 }
             }
         }
 
-        return new Response(JSON.stringify({ success: true, results }), {
+        return new Response(JSON.stringify({ success: true, results }), { 
             status: 200,
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
-            },
+            }
         });
-
+        
     } catch (error) {
         console.error('Function error:', error.message);
-        return new Response(JSON.stringify({ success: false, error: error.message }), {
+        return new Response(JSON.stringify({ success: false, error: error.message }), { 
             status: 500,
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
-            },
+            }
         });
     }
 }
