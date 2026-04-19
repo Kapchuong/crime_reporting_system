@@ -23,7 +23,7 @@ export async function onRequest(context) {
                     body: JSON.stringify({
                         personalizations: [{ to: [{ email: police.email }] }],
                         // *** UPDATED TO NEW CUSTOM DOMAIN ***
-                        from: { email: 'noreply@kapchuong.dpdns.org', name: 'Crime Alert System' },
+                        from: { email: `noreply@${env.DOMAIN}`, name: 'Crime Alert System' },
                         subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
                         content: [{ type: 'text/plain', value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}` }]
                     })
