@@ -11,6 +11,9 @@ export async function onRequest(context) {
         
         const results = [];
 
+        // Get DOMAIN from environment variables
+        const DOMAIN = context.env.DOMAIN;
+
         // 2. Loop through all police contacts and send an email
         for (const police of policeContacts) {
             if (police.email) {
@@ -22,8 +25,7 @@ export async function onRequest(context) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         personalizations: [{ to: [{ email: police.email }] }],
-                        // *** UPDATED TO NEW CUSTOM DOMAIN ***
-                        from: { email: `noreply@${env.DOMAIN}`, name: 'Crime Alert System' },
+                        from: { email: `noreply@${DOMAIN}`, name: 'Crime Alert System' },
                         subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
                         content: [{ type: 'text/plain', value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}` }]
                     })
@@ -34,8 +36,9 @@ export async function onRequest(context) {
                     results.push({ type: 'email', to: police.email, status: 'sent' });
                     console.log(`✅ Email sent to ${police.email}`);
                 } else {
+                    const errorText = await emailResponse.text();
+                    console.log(`❌ Email failed to ${police.email}: ${errorText}`);
                     results.push({ type: 'email', to: police.email, status: 'failed' });
-                    console.log(`❌ Email failed to ${police.email}`);
                 }
             }
         }
