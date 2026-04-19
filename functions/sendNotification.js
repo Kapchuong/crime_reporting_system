@@ -47,7 +47,7 @@ export async function onRequest(context) {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        from: 'Crime Alert System <onboarding@resend.dev>',
+                        from: 'Crime Alert System <noreply@kapchuong.dpdns.org>',
                         to: [police.email],
                         subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
                         text: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
