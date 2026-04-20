@@ -1,6 +1,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyCr9f1gTrP5nTEJ9RHg-vIpEQQRH_Dm96E",
-  authDomain: "crime-reporting-system-939aa.firebaseapp.com",
+  // authDomain: "crime-reporting-system-939aa.firebaseapp.com",
+  authDomain: "kapchuong.dpdns.org",
   projectId: "crime-reporting-system-939aa",
   storageBucket: "crime-reporting-system-939aa.appspot.com",
   messagingSenderId: "890706417373",
