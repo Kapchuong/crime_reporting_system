@@ -1,87 +1,144 @@
-// functions/sendNotification.js
-export async function onRequest(context) {
-    // Handle CORS preflight request
-    if (context.request.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            },
-        });
-    }
+// functions/api/sendNotification.js
+// Or check your current file path - this may be functions/sendNotification.js
 
-    // Only allow POST requests
-    if (context.request.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 });
-    }
+// Provider 1: Resend
+async function sendViaResend(emailData, apiKey) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: emailData.from,
+      to: emailData.to,
+      subject: emailData.subject,
+      html: emailData.html
+    })
+  });
+  
+  if (!response.ok) throw new Error(`Resend failed: ${response.status}`);
+  return await response.json();
+}
 
+// Provider 2: Brevo
+async function sendViaBrevo(emailData, apiKey) {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: {
+        name: 'Crime Alert System',
+        email: emailData.from
+      },
+      to: [{ email: emailData.to }],
+      subject: emailData.subject,
+      htmlContent: emailData.html
+    })
+  });
+  
+  if (!response.ok) throw new Error(`Brevo failed: ${response.status}`);
+  return await response.json();
+}
+
+// Main function - Cloudflare Pages Function
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  
+  // Check if API keys exist
+  if (!env.RESEND_API_KEY && !env.BREVO_API_KEY) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'No email providers configured' 
+    }), { status: 500 });
+  }
+  
+  let report;
+  try {
+    report = await request.json();
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Invalid request body' 
+    }), { status: 400 });
+  }
+  
+  const emailData = {
+    to: report.officerEmail,
+    from: 'alerts@kapchuong.dpdns.org',
+    subject: `URGENT: ${(report.priority || 'HIGH').toUpperCase()} Priority Crime Report`,
+    html: `<h3>New ${report.priority || 'HIGH'} Priority Incident</h3>
+           <p><strong>Type:</strong> ${report.incidentType || 'Not specified'}</p>
+           <p><strong>Location:</strong> ${report.address || 'Location captured'}</p>
+           <p><strong>Description:</strong> ${report.description || 'No description provided'}</p>
+           <p><strong>Report ID:</strong> ${report.reportId || 'N/A'}</p>
+           <hr>
+           <p><small>This is an automated alert from the Crime Reporting System.</small></p>`
+  };
+  
+  // Try Resend first (if API key exists)
+  if (env.RESEND_API_KEY) {
     try {
-        const body = await context.request.json();
-        const { reportId, incidentType, location, priority, description, policeContacts } = body;
-        
-        const results = [];
-        const RESEND_API_KEY = context.env.RESEND_API_KEY;
-
-        // Check if API key is configured
-        if (!RESEND_API_KEY) {
-            console.error('❌ RESEND_API_KEY environment variable is not set');
-            return new Response(JSON.stringify({ 
-                success: false, 
-                error: 'RESEND_API_KEY not configured' 
-            }), { 
-                status: 500,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-
-        for (const police of policeContacts) {
-            if (police.email) {
-                console.log(`Sending email to ${police.email}...`);
-                
-                const resendResponse = await fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${RESEND_API_KEY}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        from: 'Crime Alert System <noreply@kapchuong.dpdns.org>',
-                        to: [police.email],
-                        subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
-                        text: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
-                    })
-                });
-                
-                const responseText = await resendResponse.text();
-                
-                if (resendResponse.ok) {
-                    results.push({ type: 'email', to: police.email, status: 'sent' });
-                    console.log(`✅ Email sent to ${police.email}`);
-                } else {
-                    console.error(`❌ Email failed to ${police.email}: ${responseText}`);
-                    results.push({ type: 'email', to: police.email, status: 'failed', error: responseText });
-                }
-            }
-        }
-
-        return new Response(JSON.stringify({ success: true, results }), { 
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            }
-        });
-        
+      await sendViaResend(emailData, env.RESEND_API_KEY);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        provider: 'resend',
+        message: 'Alert sent successfully via Resend'
+      }));
     } catch (error) {
-        console.error('Function error:', error.message);
-        return new Response(JSON.stringify({ success: false, error: error.message }), { 
-            status: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            }
-        });
+      console.error('Resend failed:', error.message);
+      
+      // If Brevo is available, try fallback
+      if (env.BREVO_API_KEY) {
+        try {
+          await sendViaBrevo(emailData, env.BREVO_API_KEY);
+          return new Response(JSON.stringify({ 
+            success: true, 
+            provider: 'brevo-fallback',
+            message: 'Resend failed, alert sent via Brevo fallback'
+          }));
+        } catch (fallbackError) {
+          console.error('Brevo fallback also failed:', fallbackError.message);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Both email providers failed',
+            resendError: error.message,
+            brevoError: fallbackError.message
+          }), { status: 500 });
+        }
+      }
+      
+      // No Brevo fallback available
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Resend failed and no fallback configured'
+      }), { status: 500 });
     }
+  }
+  
+  // No Resend key, try Brevo only
+  if (env.BREVO_API_KEY) {
+    try {
+      await sendViaBrevo(emailData, env.BREVO_API_KEY);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        provider: 'brevo-only',
+        message: 'Alert sent via Brevo'
+      }));
+    } catch (error) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Brevo failed'
+      }), { status: 500 });
+    }
+  }
+  
+  return new Response(JSON.stringify({ 
+    success: false, 
+    error: 'No email providers configured' 
+  }), { status: 500 });
 }
