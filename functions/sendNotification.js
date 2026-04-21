@@ -32,13 +32,10 @@ export async function onRequest(context) {
             if (police.email) {
                 console.log(`Sending email to ${police.email}...`);
                 
-                // Build email payload with DKIM signing inside personalizations
+                // Build email payload - DKIM at ROOT level (not inside personalizations)
                 const emailPayload = {
                     personalizations: [{
-                        to: [{ email: police.email }],
-                        dkim_domain: DOMAIN,
-                        dkim_selector: DKIM_SELECTOR,
-                        dkim_private_key: DKIM_PRIVATE_KEY
+                        to: [{ email: police.email }]
                     }],
                     from: { email: `noreply@${DOMAIN}`, name: 'Crime Alert System' },
                     subject: `[${priority.toUpperCase()}] New Crime Report: ${incidentType}`,
@@ -47,6 +44,15 @@ export async function onRequest(context) {
                         value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
                     }]
                 };
+                
+                // Add DKIM signing at the ROOT level if private key is available
+                if (DKIM_PRIVATE_KEY) {
+                    emailPayload.dkim = {
+                        privateKey: DKIM_PRIVATE_KEY,
+                        selector: DKIM_SELECTOR,
+                        domain: DOMAIN
+                    };
+                }
                 
                 const emailRequest = new Request('https://api.mailchannels.net/tx/v1/send', {
                     method: 'POST',
