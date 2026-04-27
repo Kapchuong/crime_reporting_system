@@ -63,19 +63,31 @@
     </div>
     
     <script>
+        // ============ FIREBASE CONFIGURATION (ADDED DIRECTLY) ============
+        const firebaseConfig = {
+            apiKey: "AIzaSyCr9f1gTrP5nTEJ9RHg-vIpEQQRH_Dm96E",
+            authDomain: "crime-reporting-system-939aa.firebaseapp.com",
+            projectId: "crime-reporting-system-939aa",
+            storageBucket: "crime-reporting-system-939aa.firebasestorage.app",
+            messagingSenderId: "890706417373",
+            appId: "1:890706417373:web:22b6aaf7f074aec231ad34"
+        };
+        
+        // Initialize Firebase if not already initialized
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log('Firebase initialized successfully');
+        }
+        
         // ============ SAFE DATE FORMATTING FUNCTIONS ============
-        // These safely handle BOTH Firebase Timestamp AND regular Date objects
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
-            // Handle Firebase Timestamp (has toDate method)
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleDateString();
             }
-            // Handle regular Date object
             if (dateValue instanceof Date) {
                 return dateValue.toLocaleDateString();
             }
-            // Handle timestamp number or string
             try {
                 return new Date(dateValue).toLocaleDateString();
             } catch (e) {
@@ -85,15 +97,12 @@
         
         function safeFormatDateTime(dateValue) {
             if (!dateValue) return 'N/A';
-            // Handle Firebase Timestamp
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleString();
             }
-            // Handle regular Date object
             if (dateValue instanceof Date) {
                 return dateValue.toLocaleString();
             }
-            // Handle timestamp number or string
             try {
                 return new Date(dateValue).toLocaleString();
             } catch (e) {
@@ -101,7 +110,6 @@
             }
         }
         
-        // Convert any date type to JavaScript Date
         function toJSDate(dateValue) {
             if (!dateValue) return new Date();
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
@@ -114,7 +122,7 @@
         }
         
         let currentUser = null;
-        let db = null;
+        let db = firebase.firestore();
         
         function getReportId() { 
             return new URLSearchParams(window.location.search).get('id'); 
@@ -128,8 +136,6 @@
             }
             
             try {
-                if (!db) db = firebase.firestore();
-                
                 const reportDoc = await db.collection('reports').doc(reportId).get();
                 if (!reportDoc.exists) { 
                     document.getElementById('reportContent').innerHTML = '<div class="error">Report not found</div>'; 
@@ -161,7 +167,7 @@
                 incidentDate = toJSDate(report.incidentDate);
             }
             
-            // Handle evidence display - with safe check
+            // Handle evidence display
             let evidenceHtml = '';
             if (report.evidence && Array.isArray(report.evidence) && report.evidence.length > 0) {
                 const validEvidence = report.evidence.filter(e => e && e.url);
@@ -178,15 +184,14 @@
                             }).join('')}
                         </div>
                     </div>`;
+                } else {
+                    evidenceHtml = `<div class="report-section"><h2 class="section-title">Evidence</h2><p>No valid evidence files.</p></div>`;
                 }
             } else {
-                evidenceHtml = `<div class="report-section">
-                    <h2 class="section-title">Evidence</h2>
-                    <p>No evidence uploaded for this report.</p>
-                </div>`;
+                evidenceHtml = `<div class="report-section"><h2 class="section-title">Evidence</h2><p>No evidence uploaded for this report.</p></div>`;
             }
             
-            // Build timeline HTML with safe date formatting
+            // Build timeline HTML
             let timelineHtml = '';
             if (timeline && timeline.length > 0) {
                 timelineHtml = `<div class="report-section">
@@ -277,32 +282,38 @@
             return div.innerHTML; 
         }
         
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.right = '20px';
+            toast.style.backgroundColor = type === 'error' ? '#dc3545' : '#28a745';
+            toast.style.color = 'white';
+            toast.style.padding = '12px 20px';
+            toast.style.borderRadius = '8px';
+            toast.style.zIndex = '9999';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
         // Initialize
-        (async function init() {
-            if (!window.firebase || !firebase.auth) { 
-                document.getElementById('reportContent').innerHTML = '<div class="error">Firebase not initialized</div>'; 
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (!user) { 
+                window.location.href = 'login.html'; 
                 return; 
             }
-            
-            db = firebase.firestore();
-            
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (!user) { 
-                    window.location.href = 'login.html'; 
-                    return; 
+            currentUser = user;
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    localStorage.setItem('userRole', userDoc.data().role);
                 }
-                currentUser = user;
-                try {
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (userDoc.exists) {
-                        localStorage.setItem('userRole', userDoc.data().role);
-                    }
-                } catch (error) {
-                    console.error('Error getting user role:', error);
-                }
-                await loadReportDetails();
-            });
-        })();
+            } catch (error) {
+                console.error('Error getting user role:', error);
+            }
+            await loadReportDetails();
+        });
     </script>
 </body>
 </html>
