@@ -7,13 +7,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
-
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
-    <script src="../js/firebase-config.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -66,14 +64,18 @@
     
     <script>
         // ============ SAFE DATE FORMATTING FUNCTIONS ============
-        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        // These safely handle BOTH Firebase Timestamp AND regular Date objects
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
-            // Handle Firebase Timestamp
+            // Handle Firebase Timestamp (has toDate method)
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleDateString();
             }
-            // Handle regular Date object, string, or number
+            // Handle regular Date object
+            if (dateValue instanceof Date) {
+                return dateValue.toLocaleDateString();
+            }
+            // Handle timestamp number or string
             try {
                 return new Date(dateValue).toLocaleDateString();
             } catch (e) {
@@ -83,9 +85,15 @@
         
         function safeFormatDateTime(dateValue) {
             if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleString();
             }
+            // Handle regular Date object
+            if (dateValue instanceof Date) {
+                return dateValue.toLocaleString();
+            }
+            // Handle timestamp number or string
             try {
                 return new Date(dateValue).toLocaleString();
             } catch (e) {
@@ -93,32 +101,43 @@
             }
         }
         
-        function safeFormatTime(dateValue) {
-            if (!dateValue) return 'N/A';
+        // Convert any date type to JavaScript Date
+        function toJSDate(dateValue) {
+            if (!dateValue) return new Date();
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-                return dateValue.toDate().toLocaleTimeString();
+                return dateValue.toDate();
             }
-            try {
-                return new Date(dateValue).toLocaleTimeString();
-            } catch (e) {
-                return 'Invalid Time';
+            if (dateValue instanceof Date) {
+                return dateValue;
             }
+            return new Date(dateValue);
         }
         
         let currentUser = null;
+        let db = null;
         
-        function getReportId() { return new URLSearchParams(window.location.search).get('id'); }
+        function getReportId() { 
+            return new URLSearchParams(window.location.search).get('id'); 
+        }
         
         async function loadReportDetails() {
             const reportId = getReportId();
-            if (!reportId) { document.getElementById('reportContent').innerHTML = '<div class="error">Report ID not found</div>'; return; }
+            if (!reportId) { 
+                document.getElementById('reportContent').innerHTML = '<div class="error">Report ID not found</div>'; 
+                return; 
+            }
             
             try {
-                const db = firebase.firestore();
+                if (!db) db = firebase.firestore();
+                
                 const reportDoc = await db.collection('reports').doc(reportId).get();
-                if (!reportDoc.exists) { document.getElementById('reportContent').innerHTML = '<div class="error">Report not found</div>'; return; }
+                if (!reportDoc.exists) { 
+                    document.getElementById('reportContent').innerHTML = '<div class="error">Report not found</div>'; 
+                    return; 
+                }
                 
                 const report = { id: reportDoc.id, ...reportDoc.data() };
+                console.log('Report loaded:', report);
                 
                 // Get timeline
                 const timelineSnapshot = await db.collection('reports').doc(reportId).collection('timeline').orderBy('createdAt', 'desc').get();
@@ -128,67 +147,55 @@
                 displayReportDetails(report, timeline);
             } catch (error) {
                 console.error('Error loading report details:', error);
-                document.getElementById('reportContent').innerHTML = '<div class="error">Error loading report</div>';
+                document.getElementById('reportContent').innerHTML = `<div class="error">Error loading report: ${error.message}</div>`;
             }
         }
         
         function displayReportDetails(report, timeline) {
-            // Handle both Firebase Timestamp and regular Date objects for createdAt
-            let createdAt;
-            if (report.createdAt) {
-                if (report.createdAt.toDate) {
-                    createdAt = report.createdAt.toDate();
-                } else {
-                    createdAt = new Date(report.createdAt);
-                }
-            } else {
-                createdAt = new Date();
-            }
+            // Safe date conversion for createdAt
+            const createdAt = toJSDate(report.createdAt);
             
-            // Handle incidentDate (could be Firebase Timestamp or regular Date)
+            // Safe date conversion for incidentDate
             let incidentDate = null;
             if (report.incidentDate) {
-                if (report.incidentDate.toDate) {
-                    incidentDate = report.incidentDate.toDate();
-                } else {
-                    incidentDate = new Date(report.incidentDate);
-                }
+                incidentDate = toJSDate(report.incidentDate);
             }
             
+            // Handle evidence display - with safe check
             let evidenceHtml = '';
-            if (report.evidence && report.evidence.length > 0) {
+            if (report.evidence && Array.isArray(report.evidence) && report.evidence.length > 0) {
+                const validEvidence = report.evidence.filter(e => e && e.url);
+                if (validEvidence.length > 0) {
+                    evidenceHtml = `<div class="report-section">
+                        <h2 class="section-title">Evidence (${validEvidence.length} files)</h2>
+                        <div class="evidence-grid">
+                            ${validEvidence.map(e => {
+                                const isImage = e.type && e.type.startsWith('image/');
+                                return `<div class="evidence-item" onclick="viewEvidence('${e.url}')">
+                                    ${isImage ? `<img src="${e.url}" alt="Evidence" onerror="this.src='https://via.placeholder.com/150?text=Image+Not+Available'">` : 
+                                    `<video><source src="${e.url}"></video><i class="fas fa-play" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: white; font-size: 2rem;"></i>`}
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+                }
+            } else {
                 evidenceHtml = `<div class="report-section">
                     <h2 class="section-title">Evidence</h2>
-                    <div class="evidence-grid">
-                        ${report.evidence.map(e => {
-                            // Check if evidence has valid URL
-                            if (!e.url) return '';
-                            const isImage = e.type && e.type.startsWith('image/');
-                            return `<div class="evidence-item" onclick="viewEvidence('${e.url}')">
-                                ${isImage ? `<img src="${e.url}" alt="Evidence">` : `<video><source src="${e.url}"></video><i class="fas fa-play" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: white; font-size: 2rem;"></i>`}
-                            </div>`;
-                        }).join('')}
-                    </div>
+                    <p>No evidence uploaded for this report.</p>
                 </div>`;
             }
             
             // Build timeline HTML with safe date formatting
             let timelineHtml = '';
-            if (timeline.length > 0) {
+            if (timeline && timeline.length > 0) {
                 timelineHtml = `<div class="report-section">
                     <h2 class="section-title">Timeline</h2>
                     <div class="timeline">
                         ${timeline.map(item => {
-                            let itemDate = 'N/A';
-                            if (item.createdAt) {
-                                if (item.createdAt.toDate) {
-                                    itemDate = item.createdAt.toDate().toLocaleString();
-                                } else {
-                                    itemDate = new Date(item.createdAt).toLocaleString();
-                                }
-                            }
+                            const itemDate = toJSDate(item.createdAt);
                             return `<div class="timeline-item">
-                                <div class="timeline-date">${itemDate}</div>
+                                <div class="timeline-date">${safeFormatDateTime(itemDate)}</div>
                                 <div><strong>${escapeHtml(item.type || 'Update')}</strong></div>
                                 ${item.note ? `<div>${escapeHtml(item.note)}</div>` : ''}
                                 ${item.officerName ? `<div><small>By: ${escapeHtml(item.officerName)}</small></div>` : ''}
@@ -221,12 +228,12 @@
                             <div class="detail-value">${escapeHtml(report.location || 'N/A')}</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-label">Date & Time</div>
-                            <div class="detail-value">${incidentDate ? incidentDate.toLocaleString() : 'N/A'}</div>
+                            <div class="detail-label">Date & Time of Incident</div>
+                            <div class="detail-value">${incidentDate ? safeFormatDateTime(incidentDate) : 'N/A'}</div>
                         </div>
                         <div class="detail-item">
                             <div class="detail-label">Reporter</div>
-                            <div class="detail-value">${escapeHtml(report.userName || 'Anonymous')}</div>
+                            <div class="detail-value">${escapeHtml(report.userName || report.reporterName || 'Anonymous')}</div>
                         </div>
                         <div class="detail-item">
                             <div class="detail-label">Assigned To</div>
@@ -270,13 +277,14 @@
             return div.innerHTML; 
         }
         
+        // Initialize
         (async function init() {
             if (!window.firebase || !firebase.auth) { 
                 document.getElementById('reportContent').innerHTML = '<div class="error">Firebase not initialized</div>'; 
                 return; 
             }
             
-            const db = firebase.firestore();
+            db = firebase.firestore();
             
             firebase.auth().onAuthStateChanged(async (user) => {
                 if (!user) { 
@@ -289,11 +297,10 @@
                     if (userDoc.exists) {
                         localStorage.setItem('userRole', userDoc.data().role);
                     }
-                    await loadReportDetails();
                 } catch (error) {
                     console.error('Error getting user role:', error);
-                    await loadReportDetails();
                 }
+                await loadReportDetails();
             });
         })();
     </script>
