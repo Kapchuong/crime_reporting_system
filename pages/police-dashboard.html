@@ -231,6 +231,46 @@
     </div>
     
     <script>
+        // ============ SAFE DATE FORMATTING FUNCTIONS ============
+        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        function safeFormatDate(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleDateString();
+            }
+            // Handle regular Date object, string, or number
+            try {
+                return new Date(dateValue).toLocaleDateString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatDateTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleString();
+            }
+            try {
+                return new Date(dateValue).toLocaleString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleTimeString();
+            }
+            try {
+                return new Date(dateValue).toLocaleTimeString();
+            } catch (e) {
+                return 'Invalid Time';
+            }
+        }
+        
         let currentUser = null;
         let currentReportId = null;
         let currentFilter = 'all';
@@ -286,13 +326,11 @@
         async function showNotifications() {
             if (!db || !currentUser) return;
             try {
-                // Removed .orderBy('createdAt', 'desc') to avoid index requirement
                 const snapshot = await db.collection('notifications')
                     .where('userId', '==', currentUser.uid)
                     .limit(20)
                     .get();
                 
-                // Sort on client side instead
                 let notifications = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -303,7 +341,6 @@
                     });
                 });
                 
-                // Sort manually by createdAt (newest first)
                 notifications.sort((a, b) => b.createdAt - a.createdAt);
                 
                 let html = '';
@@ -347,7 +384,7 @@
                                         </div>
                                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #666;">${escapeHtml(notif.message)}</p>
                                         <small style="color: #999;">
-                                            ${notif.createdAt ? notif.createdAt.toLocaleString() : 'Just now'}
+                                            ${notif.createdAt ? safeFormatDateTime(notif.createdAt) : 'Just now'}
                                         </small>
                                     </div>
                                 </div>
@@ -612,11 +649,8 @@
             
             tbody.innerHTML = reports.map(report => {
                 const reporterName = report.userName || report.reporterName || 'Anonymous';
-                let dateStr = 'N/A';
-                if (report.createdAt) {
-                    const date = report.createdAt.toDate ? report.createdAt.toDate() : new Date(report.createdAt);
-                    dateStr = date.toLocaleString();
-                }
+                // Use safeFormatDateTime to handle both Firebase Timestamp and regular Date objects
+                const dateStr = safeFormatDateTime(report.createdAt);
                 
                 const isClosed = report.status === 'closed';
                 const rowClass = report.priority === 'high' && !isClosed ? 'high-priority' : (isClosed ? 'closed-report' : '');
@@ -634,7 +668,7 @@
                         ${!isClosed ? `<button class="btn-update" onclick="openStatusModal('${report.id}')"><i class="fas fa-edit"></i></button>` : ''}
                         ${!isClosed ? `<button class="btn-assign" onclick="assignReport('${report.id}')"><i class="fas fa-user-plus"></i></button>` : ''}
                         ${!isClosed ? `<button class="btn-close" onclick="openCloseReportModal('${report.id}')"><i class="fas fa-archive"></i> Close</button>` : '<span style="color:#666; font-size:11px;">Closed</span>'}
-                    </td>
+                     </nav>
                 </tr>`;
             }).join('');
         }
@@ -831,14 +865,13 @@
                     await loadNotificationCount();
                     setupRealtimeListener();
                     
-                    // Set up real-time notification listener - removed .orderBy to avoid index requirement
+                    // Set up real-time notification listener
                     db.collection('notifications')
                         .where('userId', '==', currentUser.uid)
                         .where('read', '==', false)
                         .onSnapshot((snapshot) => {
                             unreadNotifications = snapshot.size;
                             updateNotificationBadge();
-                            // Show toast for new notifications
                             snapshot.docChanges().forEach((change) => {
                                 if (change.type === 'added') {
                                     const notif = change.doc.data();
@@ -857,28 +890,41 @@
         })();
         
         // Event listeners
-        document.getElementById('searchReports').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            if (!searchTerm) { 
-                displayReports(allReports); 
-                return; 
-            }
-            const filtered = allReports.filter(report => 
-                (report.incidentType || '').toLowerCase().includes(searchTerm) ||
-                (report.location || '').toLowerCase().includes(searchTerm) ||
-                (report.id || '').toLowerCase().includes(searchTerm)
-            );
-            displayReports(filtered);
-        });
+        const searchInput = document.getElementById('searchReports');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                if (!searchTerm) { 
+                    displayReports(allReports); 
+                    return; 
+                }
+                const filtered = allReports.filter(report => 
+                    (report.incidentType || '').toLowerCase().includes(searchTerm) ||
+                    (report.location || '').toLowerCase().includes(searchTerm) ||
+                    (report.id || '').toLowerCase().includes(searchTerm)
+                );
+                displayReports(filtered);
+            });
+        }
         
-        document.getElementById('filterStatus').addEventListener('change', () => {
-            const filter = document.getElementById('filterStatus').value;
-            currentFilter = filter;
-            loadReports();
-        });
+        const filterStatus = document.getElementById('filterStatus');
+        if (filterStatus) {
+            filterStatus.addEventListener('change', () => {
+                const filter = filterStatus.value;
+                currentFilter = filter;
+                loadReports();
+            });
+        }
         
-        document.getElementById('saveStatusBtn').onclick = saveStatusUpdate;
-        document.getElementById('confirmCloseBtn').onclick = closeReport;
+        const saveStatusBtn = document.getElementById('saveStatusBtn');
+        if (saveStatusBtn) {
+            saveStatusBtn.onclick = saveStatusUpdate;
+        }
+        
+        const confirmCloseBtn = document.getElementById('confirmCloseBtn');
+        if (confirmCloseBtn) {
+            confirmCloseBtn.onclick = closeReport;
+        }
         
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
