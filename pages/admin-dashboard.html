@@ -318,7 +318,7 @@
                             <thead>
                                 <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Details</th><th>Status</th><th>Joined</th><th>Last Login</th><th>Actions</th> </thead>
                             <tbody id="usersTableBody">:<td colspan="9" style="text-align: center;">Loading users... </tbody>
-                         </table>
+                          </table>
                     </div>
                 </div>
             </div>
@@ -342,7 +342,7 @@
                         <table class="reports-table">
                             <thead> <th>ID</th><th>Type</th><th>Location</th><th>Priority</th><th>Status</th><th>Reporter</th><th>Date</th><th>Action</th> </thead>
                             <tbody id="adminReportsTableBody"> <td colspan="8" style="text-align: center;">Loading reports... </tbody>
-                        </table>
+                         </table>
                     </div>
                 </div>
             </div>
@@ -441,6 +441,43 @@
         
         console.log('Firebase initialized successfully');
         
+        // ============= HELPER FUNCTIONS FOR DATE FORMATTING (FIXED) =============
+        // This safely handles BOTH Firebase Timestamp AND regular Date objects
+        function safeFormatDate(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp (has toDate method)
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleDateString();
+            }
+            // Handle regular Date object or string
+            return new Date(dateValue).toLocaleDateString();
+        }
+        
+        function safeFormatDateTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleString();
+            }
+            // Handle regular Date object or string
+            return new Date(dateValue).toLocaleString();
+        }
+        
+        function safeFormatTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleTimeString();
+            }
+            // Handle regular Date object or string
+            return new Date(dateValue).toLocaleTimeString();
+        }
+        
+        // Legacy functions kept for compatibility (now use safe versions)
+        function formatDate(t) { return safeFormatDate(t); }
+        function formatDateTime(t) { return safeFormatDateTime(t); }
+        function formatTime(t) { return safeFormatTime(t); }
+        
         // ============= GLOBAL VARIABLES =============
         let currentUser = null;
         let editUserId = null;
@@ -457,24 +494,6 @@
                 if (m === '>') return '&gt;'; 
                 return m; 
             }); 
-        }
-        
-        function formatDate(t) { 
-            if (!t) return 'N/A'; 
-            if (t.toDate) return t.toDate().toLocaleDateString(); 
-            return new Date(t).toLocaleDateString(); 
-        }
-        
-        function formatDateTime(t) { 
-            if (!t) return 'N/A'; 
-            if (t.toDate) return t.toDate().toLocaleString(); 
-            return new Date(t).toLocaleString(); 
-        }
-        
-        function formatTime(t) { 
-            if (!t) return 'N/A'; 
-            if (t.toDate) return t.toDate().toLocaleTimeString(); 
-            return new Date(t).toLocaleTimeString(); 
         }
         
         function showToast(msg, type = 'info') {
@@ -709,13 +728,13 @@
                         <td><span class="role-badge role-${user.role || 'citizen'}">${user.role || 'citizen'}</span></td>
                         <td>${roleDetails}</td>
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                        <td>${user.createdAt ? formatDate(user.createdAt) : 'N/A'}</td>
-                        <td>${user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</td>
+                        <td>${user.createdAt ? safeFormatDate(user.createdAt) : 'N/A'}</td>
+                        <td>${user.lastLogin ? safeFormatDate(user.lastLogin) : 'Never'}</td>
                         <td class="action-buttons">
                             <button class="btn-edit" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button>
                             ${!isPending ? `<button class="btn-toggle" onclick="toggleUserStatus('${user.id}', ${!user.isActive})"><i class="fas fa-${user.isActive ? 'ban' : 'check'}"></i></button>` : ''}
                             <button class="btn-delete" onclick="deleteUser('${user.id}')"><i class="fas fa-trash"></i></button>
-                        </td>
+                         </td>
                     </tr>`;
                 }).join('');
             } catch (error) { 
@@ -919,7 +938,7 @@
                     <td><span class="priority-badge priority-${report.priority || 'low'}">${(report.priority || 'low').toUpperCase()}</span></td>
                     <td><span class="status-badge status-${report.status || 'pending'}">${(report.status || 'pending').replace('_', ' ')}</span></td>
                     <td>${escapeHtml(report.userName || 'Anonymous')}</td>
-                    <td>${report.createdAt ? formatDateTime(report.createdAt) : 'N/A'}</td>
+                    <td>${report.createdAt ? safeFormatDateTime(report.createdAt) : 'N/A'}</td>
                     <td><button class="btn-view" onclick="viewReport('${report.id}')"><i class="fas fa-eye"></i> View</button></td>
                 </tr>`).join('');
             } catch (error) { 
@@ -995,7 +1014,7 @@
                     return; 
                 }
                 container.innerHTML = logs.map(log => `<div class="log-entry log-${log.level || 'info'}">
-                    <span class="log-time">${log.timestamp ? formatTime(log.timestamp) : 'N/A'}</span>
+                    <span class="log-time">${log.timestamp ? safeFormatTime(log.timestamp) : 'N/A'}</span>
                     <span class="log-level">[${(log.level || 'INFO').toUpperCase()}]</span>
                     <span class="log-message">${escapeHtml(log.message || log.action || '')}</span>
                     <span class="log-user">- ${escapeHtml(log.user || 'System')}</span>
@@ -1068,8 +1087,8 @@
                         <td><span class="role-badge role-${user.role || 'citizen'}">${user.role || 'citizen'}</span></td>
                         <td></td>
                         <td><span class="status-badge status-${user.isActive ? 'active' : 'inactive'}">${user.isActive ? 'Active' : 'Inactive'}</span></td>
-                        <td>${user.createdAt ? formatDate(user.createdAt) : 'N/A'}</td>
-                        <td>${user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</td>
+                        <td>${user.createdAt ? safeFormatDate(user.createdAt) : 'N/A'}</td>
+                        <td>${user.lastLogin ? safeFormatDate(user.lastLogin) : 'Never'}</td>
                         <td><button class="btn-edit" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button>
                         <button class="btn-delete" onclick="deleteUser('${user.id}')"><i class="fas fa-trash"></i></button></td>
                     </tr>`).join('');
@@ -1079,8 +1098,7 @@
             });
         }
         
-        // ============= AUTHENTICATION CHECK - FIXED VERSION =============
-        // First, check if there's a user in Firebase Auth
+        // ============= AUTHENTICATION CHECK =============
         auth.onAuthStateChanged(async (user) => {
             console.log('Auth state changed. User:', user ? user.email : 'No user');
             
@@ -1091,7 +1109,6 @@
             }
             
             try {
-                // Get the user document from Firestore
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 console.log('User document exists:', userDoc.exists);
                 
@@ -1108,7 +1125,6 @@
                 const userData = userDoc.data();
                 console.log('User role:', userData.role);
                 
-                // Check if user has admin role
                 if (userData.role !== 'admin') {
                     console.log('User is not admin. Role:', userData.role);
                     showToast('Access denied. Admin privileges required.', 'error');
@@ -1119,7 +1135,6 @@
                     return;
                 }
                 
-                // Admin is authenticated - load dashboard
                 console.log('Admin authenticated successfully');
                 currentUser = user;
                 const adminNameElem = document.getElementById('adminName');
@@ -1127,7 +1142,6 @@
                     adminNameElem.textContent = userData.fullName || user.displayName || 'Admin';
                 }
                 
-                // Load all dashboard data
                 await Promise.all([
                     loadSystemStats(), 
                     loadUsers(), 
@@ -1136,14 +1150,12 @@
                     loadSystemLogs()
                 ]);
                 
-                // Show dashboard section
                 showSection('dashboard');
                 showToast('Welcome back, ' + (userData.fullName || 'Admin') + '!', 'success');
                 
             } catch (error) { 
                 console.error('Authentication error:', error); 
                 showToast('Error loading dashboard: ' + error.message, 'error');
-                // Don't redirect immediately, let the user see the error
             }
         });
         
@@ -1158,8 +1170,7 @@
             }
         };
         
-        // ============= ADDITIONAL DEBUGGING HELP =============
-        // Function to create admin user if none exists (for first-time setup)
+        // ============= CREATE DEFAULT ADMIN IF NEEDED =============
         async function createDefaultAdminIfNeeded() {
             try {
                 const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
@@ -1172,7 +1183,6 @@
             }
         }
         
-        // Run this after auth check
         setTimeout(() => {
             if (currentUser) {
                 createDefaultAdminIfNeeded();
