@@ -557,6 +557,7 @@
                     const userDoc = await db.collection('users').doc(currentUser.uid).get();
                     const userData = userDoc.data();
                     
+                    // ============ CORRECTED: Using new Date() instead of serverTimestamp() inside array ============
                     const reportData = {
                         incidentType: incidentType,
                         description: description.trim(),
@@ -570,13 +571,13 @@
                         userEmail: isAnonymous ? null : currentUser.email,
                         userContact: isAnonymous ? null : (userData?.phone || ''),
                         status: 'pending',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(), // This is fine (not in array)
                         evidence: uploadedFiles.map(file => ({
                             url: file.url,
                             type: file.type,
                             name: file.name,
                             size: file.size,
-                            uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            uploadedAt: new Date(), // ✅ FIXED: Regular Date object (works inside arrays)
                             source: 'Cloudinary'
                         }))
                     };
