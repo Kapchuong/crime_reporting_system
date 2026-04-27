@@ -13,6 +13,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     
+    <!-- Cloudinary Widget (No CORS Issues!) -->
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #f5f7fa; }
@@ -95,11 +98,44 @@
         .priority-slider input { flex: 1; }
         .priority-value { min-width: 80px; padding: 0.5rem; background: #f5f5f5; border-radius: 5px; text-align: center; font-weight: 600; }
         
-        .file-upload { border: 2px dashed #e0e0e0; padding: 2rem; text-align: center; border-radius: 5px; cursor: pointer; transition: all 0.3s ease; }
-        .file-upload:hover { border-color: #1e3c72; background: rgba(30,60,114,0.05); }
+        /* Cloudinary Upload Styles */
+        .btn-cloudinary {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn-cloudinary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
         .file-list { margin-top: 1rem; }
-        .file-item { display: flex; align-items: center; gap: 1rem; padding: 0.5rem; background: #f5f5f5; border-radius: 5px; margin-bottom: 0.5rem; }
-        .remove-file { margin-left: auto; color: #dc3545; cursor: pointer; }
+        .file-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; margin-bottom: 0.5rem; }
+        .file-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+        .file-item video { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+        .file-info { flex: 1; }
+        .file-info strong { display: block; font-size: 14px; }
+        .file-info small { font-size: 12px; color: #666; }
+        .remove-file { color: #dc3545; cursor: pointer; font-size: 18px; padding: 5px; }
+        .remove-file:hover { color: #c82333; }
+        
+        .upload-success-notice {
+            margin-top: 10px;
+            padding: 10px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            color: #155724;
+            font-size: 14px;
+        }
         
         .checkbox-container { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
         .checkbox-container input { width: auto; margin-right: 8px; }
@@ -215,16 +251,17 @@
                             <textarea id="suspectInfo" rows="3" placeholder="Description of suspect(s), clothing, vehicle, etc."></textarea>
                         </div>
                         
+                        <!-- Cloudinary Evidence Upload (No CORS Issues!) -->
                         <div class="form-group">
                             <label>Evidence (Photos/Videos)</label>
-                            <div class="file-upload" id="fileUpload">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Click or drag files to upload</p>
+                            <button type="button" class="btn-cloudinary" id="cloudinaryUploadBtn">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Evidence via Cloudinary
+                            </button>
+                            <div class="file-list" id="fileList">
+                                <p style="color: #999; padding: 10px; text-align: center;">No files uploaded yet. Click the button above to add evidence.</p>
                             </div>
-                            <input type="file" id="evidence" multiple accept="image/*,video/*" style="display: none;">
-                            <div class="file-list" id="fileList"></div>
-                            <div class="upload-notice" style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404; font-size: 14px;">
-                                <i class="fas fa-info-circle"></i> <strong>Note:</strong> File uploads may fail due to CORS restrictions during development. Your report will still be submitted successfully even if files cannot be uploaded.
+                            <div class="upload-success-notice">
+                                <i class="fas fa-check-circle"></i> <strong>Cloudinary Active:</strong> Files are uploaded via Cloudinary which bypasses CORS restrictions. Your evidence will be saved successfully!
                             </div>
                         </div>
                         
@@ -247,8 +284,8 @@
         </button>
     </div>
     
-    <!-- Firebase Configuration -->
     <script>
+        // ============ Firebase Configuration ============
         const firebaseConfig = {
             apiKey: "AIzaSyCr9f1gTrP5nTEJ9RHg-vIpEQQRH_Dm96E",
             authDomain: "crime-reporting-system-939aa.firebaseapp.com",
@@ -265,28 +302,120 @@
         
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const storage = firebase.storage();
         
         let currentUser = null;
-        let selectedFiles = [];
+        let uploadedFiles = []; // Store Cloudinary uploaded file URLs
         
-        // ============ UPDATED: Function to call Cloudflare for notifications ============
+        // ============ Cloudinary Configuration (YOUR CREDENTIALS) ============
+        const CLOUDINARY_CLOUD_NAME = 'dqw0gkurl';
+        const CLOUDINARY_UPLOAD_PRESET = 'crime_reports_preset';
+        
+        // Cloudinary Upload Function (No CORS Issues!)
+        function openCloudinaryUpload() {
+            console.log('Opening Cloudinary widget...');
+            
+            const widget = cloudinary.createUploadWidget(
+                {
+                    cloudName: CLOUDINARY_CLOUD_NAME,
+                    uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+                    multiple: true,
+                    maxFiles: 5,
+                    maxFileSize: 10485760, // 10MB
+                    sources: ['local', 'camera', 'url'],
+                    showCompletedButton: true,
+                    cropping: false,
+                    folder: 'crime_evidence',
+                    tags: ['crime_evidence', 'user_submitted']
+                },
+                (error, result) => {
+                    if (error) {
+                        console.error('Cloudinary upload error:', error);
+                        showToast('Upload failed. Please try again.', 'error');
+                        return;
+                    }
+                    
+                    if (result && result.event === 'success') {
+                        const fileUrl = result.info.secure_url;
+                        const fileType = result.info.resource_type;
+                        const fileName = result.info.original_filename;
+                        
+                        uploadedFiles.push({
+                            url: fileUrl,
+                            type: fileType === 'image' ? 'image/' + (result.info.format || 'jpeg') : 'video/mp4',
+                            name: fileName,
+                            size: result.info.bytes,
+                            uploadedAt: new Date()
+                        });
+                        
+                        updateCloudinaryFileList();
+                        showToast(`✓ File "${fileName}" uploaded successfully!`, 'success');
+                        console.log('File uploaded:', fileUrl);
+                    }
+                    
+                    if (result && result.event === 'close') {
+                        console.log('Cloudinary widget closed. Total files uploaded:', uploadedFiles.length);
+                    }
+                }
+            );
+            widget.open();
+        }
+        
+        // Update file list display
+        function updateCloudinaryFileList() {
+            const fileList = document.getElementById('fileList');
+            if (!fileList) return;
+            
+            fileList.innerHTML = '';
+            
+            if (uploadedFiles.length === 0) {
+                fileList.innerHTML = '<p style="color: #999; padding: 10px; text-align: center;">No files uploaded yet. Click the button above to add evidence.</p>';
+                return;
+            }
+            
+            uploadedFiles.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                
+                let preview = '';
+                if (file.type.startsWith('image/')) {
+                    preview = `<img src="${file.url}" alt="${file.name}">`;
+                } else if (file.type.startsWith('video/')) {
+                    preview = `<video src="${file.url}" style="width: 60px; height: 60px; object-fit: cover;"></video>`;
+                } else {
+                    preview = `<i class="fas fa-file" style="font-size: 30px;"></i>`;
+                }
+                
+                div.innerHTML = `
+                    ${preview}
+                    <div class="file-info">
+                        <strong>${file.name}</strong>
+                        <small>${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                    </div>
+                    <i class="fas fa-trash-alt remove-file" onclick="removeCloudinaryFile(${index})"></i>
+                `;
+                fileList.appendChild(div);
+            });
+        }
+        
+        // Remove file from list
+        window.removeCloudinaryFile = function(index) {
+            uploadedFiles.splice(index, 1);
+            updateCloudinaryFileList();
+            showToast('File removed', 'info');
+        };
+        
+        // ============ Function to call Cloudflare for notifications ============
         async function sendNotificationsViaCloudflare(reportId, reportData) {
             try {
-                // Define your Cloudflare Pages function URL
                 const cloudflareUrl = 'https://crime-reporting-system.pages.dev/sendNotification';
                 console.log(`📡 Calling Cloudflare function at: ${cloudflareUrl}`);
                 
-                // Get all police contacts from Firestore
                 const policeSnapshot = await db.collection('users').where('role', '==', 'police').get();
                 const policeContacts = [];
                 policeSnapshot.forEach(doc => {
                     const data = doc.data();
-                    if (data.email || data.phone) {
-                        policeContacts.push({
-                            email: data.email || null,
-                            phone: data.phone || null
-                        });
+                    if (data.email) {
+                        policeContacts.push({ email: data.email });
                     }
                 });
                 
@@ -299,9 +428,7 @@
                 
                 const response = await fetch(cloudflareUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         reportId: reportId,
                         incidentType: reportData.incidentType,
@@ -315,24 +442,17 @@
                 const result = await response.json();
                 console.log('📧 Cloudflare notification result:', result);
                 
-                if (result.success) {
-                    console.log('✅ Notifications sent successfully via Cloudflare');
-                } else {
-                    console.warn('⚠️ Cloudflare notifications had issues:', result);
-                }
-                
             } catch (error) {
                 console.error('❌ Error calling Cloudflare function:', error);
-                // Don't throw - notifications are nice-to-have but not critical
             }
         }
         
         function showToast(msg, type = 'info') {
             const toast = document.createElement('div');
             toast.className = 'toast-notification';
-            if (type === 'success') toast.style.background = '#4caf50';
-            else if (type === 'error') toast.style.background = '#f44336';
-            else toast.style.background = '#333';
+            if (type === 'success') toast.style.background = '#28a745';
+            else if (type === 'error') toast.style.background = '#dc3545';
+            else toast.style.background = '#17a2b8';
             toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i> ${msg}`;
             document.body.appendChild(toast);
             setTimeout(() => {
@@ -391,80 +511,15 @@
                 else if (value > 33) { priority = 'medium'; text = 'Medium'; }
                 document.getElementById('priority').value = priority;
                 document.getElementById('priorityValue').textContent = `${text} (${value}%)`;
-                document.getElementById('priorityValue').style.color = value > 66 ? '#dc3545' : value > 33 ? '#ff9800' : '#4caf50';
+                document.getElementById('priorityValue').style.color = value > 66 ? '#dc3545' : value > 33 ? '#ff9800' : '#28a745';
             });
         }
         
-        // File upload handling
-        const fileUpload = document.getElementById('fileUpload');
-        const fileInput = document.getElementById('evidence');
-        
-        if (fileUpload) {
-            fileUpload.addEventListener('click', () => fileInput.click());
-            
-            fileUpload.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                fileUpload.style.borderColor = '#1e3c72';
-                fileUpload.style.background = 'rgba(30,60,114,0.05)';
-            });
-            
-            fileUpload.addEventListener('dragleave', () => {
-                fileUpload.style.borderColor = '#e0e0e0';
-                fileUpload.style.background = 'transparent';
-            });
-            
-            fileUpload.addEventListener('drop', (e) => {
-                e.preventDefault();
-                fileUpload.style.borderColor = '#e0e0e0';
-                fileUpload.style.background = 'transparent';
-                const files = e.dataTransfer.files;
-                handleFiles(files);
-            });
+        // Connect Cloudinary Upload Button
+        const cloudinaryBtn = document.getElementById('cloudinaryUploadBtn');
+        if (cloudinaryBtn) {
+            cloudinaryBtn.addEventListener('click', openCloudinaryUpload);
         }
-        
-        if (fileInput) {
-            fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
-            });
-        }
-        
-        function handleFiles(files) {
-            for (let file of files) {
-                if (file.size > 10 * 1024 * 1024) {
-                    showToast(`File ${file.name} is too large. Max 10MB.`, 'error');
-                    continue;
-                }
-                if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-                    showToast(`File ${file.name} is not an image or video.`, 'error');
-                    continue;
-                }
-                selectedFiles.push(file);
-            }
-            updateFileList();
-        }
-        
-        function updateFileList() {
-            const fileList = document.getElementById('fileList');
-            if (!fileList) return;
-            fileList.innerHTML = '';
-            selectedFiles.forEach((file, index) => {
-                const div = document.createElement('div');
-                div.className = 'file-item';
-                div.innerHTML = `
-                    <i class="fas fa-${file.type.startsWith('image/') ? 'image' : 'video'}"></i>
-                    <span>${file.name}</span>
-                    <small>(${(file.size / 1024 / 1024).toFixed(2)} MB)</small>
-                    <i class="fas fa-times remove-file" onclick="removeFile(${index})"></i>
-                `;
-                fileList.appendChild(div);
-            });
-        }
-        
-        window.removeFile = function(index) {
-            selectedFiles.splice(index, 1);
-            updateFileList();
-            if (fileInput) fileInput.value = '';
-        };
         
         // Form submission
         const reportForm = document.getElementById('reportForm');
@@ -492,7 +547,6 @@
                     const suspectInfo = document.getElementById('suspectInfo').value;
                     const isAnonymous = document.getElementById('anonymous').checked;
                     
-                    // Validation
                     if (!incidentType) throw new Error('Please select an incident type');
                     if (!description.trim()) throw new Error('Please provide an incident description');
                     if (!location.trim()) throw new Error('Please provide the incident location');
@@ -517,72 +571,31 @@
                         userContact: isAnonymous ? null : (userData?.phone || ''),
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        evidence: []
+                        evidence: uploadedFiles.map(file => ({
+                            url: file.url,
+                            type: file.type,
+                            name: file.name,
+                            size: file.size,
+                            uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            source: 'Cloudinary'
+                        }))
                     };
                     
-                    // Upload evidence files with error handling
-                    console.log(`Attempting to upload ${selectedFiles.length} files...`);
-                    let uploadErrors = [];
+                    console.log(`Saving report with ${uploadedFiles.length} evidence file(s)`);
                     
-                    for (let i = 0; i < selectedFiles.length; i++) {
-                        const file = selectedFiles[i];
-                        try {
-                            const filename = `${currentUser.uid}_${Date.now()}_${i}_${file.name}`;
-                            const storageRef = storage.ref().child(`evidence/${filename}`);
-                            
-                            const uploadTask = storageRef.put(file);
-                            const snapshot = await Promise.race([
-                                uploadTask,
-                                new Promise((_, reject) => 
-                                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
-                                )
-                            ]);
-                            
-                            const url = await snapshot.ref.getDownloadURL();
-                            reportData.evidence.push({
-                                url: url,
-                                type: file.type,
-                                name: file.name,
-                                size: file.size,
-                                uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            console.log(`File ${file.name} uploaded successfully`);
-                        } catch (uploadError) {
-                            console.error(`Failed to upload ${file.name}:`, uploadError);
-                            uploadErrors.push(file.name);
-                            
-                            reportData.evidence.push({
-                                name: file.name,
-                                type: file.type,
-                                size: file.size,
-                                error: 'Upload failed due to CORS or network issues',
-                                uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        }
-                    }
-                    
-                    if (uploadErrors.length > 0) {
-                        console.warn(`Some files failed to upload: ${uploadErrors.join(', ')}`);
-                        showToast(`Report submitted but ${uploadErrors.length} file(s) failed to upload due to CORS issues. Report saved with file details.`, 'warning');
-                    }
-                    
-                    // Save to Firestore
-                    console.log('Saving report to Firestore...');
                     const docRef = await db.collection('reports').add(reportData);
                     const reportId = docRef.id;
                     console.log('Report saved with ID:', reportId);
                     
-                    // ============ Send notifications via Cloudflare ============
+                    // Send notifications via Cloudflare
                     await sendNotificationsViaCloudflare(reportId, reportData);
                     
-                    showToast(`Report submitted successfully!\nReference: ${reportId.slice(0, 8).toUpperCase()}` + 
-                        (uploadErrors.length > 0 ? `\n\n⚠️ ${uploadErrors.length} file(s) failed to upload due to CORS issues.` : ''), 
-                        uploadErrors.length > 0 ? 'warning' : 'success');
+                    showToast(`✓ Report submitted successfully!\nReference: ${reportId.slice(0, 8).toUpperCase()}\n📎 ${uploadedFiles.length} evidence file(s) uploaded`, 'success');
                     
                     // Clear form
                     reportForm.reset();
-                    selectedFiles = [];
-                    updateFileList();
+                    uploadedFiles = [];
+                    updateCloudinaryFileList();
                     
                     // Set default datetime again
                     const now = new Date();
@@ -601,8 +614,6 @@
                     submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Report';
                 }
             });
-        } else {
-            console.error('Report form not found!');
         }
         
         // Emergency button
@@ -630,7 +641,7 @@
             dateTimeInput.value = now.toISOString().slice(0, 16);
         }
         
-        console.log('Page loaded and ready');
+        console.log('✅ Page loaded and ready! Cloudinary upload ready with cloud name: dqw0gkurl');
     </script>
 </body>
 </html>
