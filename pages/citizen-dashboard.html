@@ -199,6 +199,46 @@
     <div id="helpModal" class="modal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-question-circle"></i> Help & Support</h3><button class="modal-close" onclick="closeHelpModal()">&times;</button></div><div class="modal-body"><h4>How to Report a Crime</h4><p>Click on "Report Crime" in the sidebar and fill out the form.</p><h4>Emergency Reporting</h4><p>For emergencies, click the red EMERGENCY banner or call 999 directly.</p><h4>Tracking Your Report</h4><p>All your reports are listed in "My Reports". Click on any report to see its status.</p><h4>Contact Support</h4><p>Email: support@kiryandongo.go.ug<br>Phone: +256 700 123 456</p></div><div class="modal-footer"><button class="btn-standard" onclick="closeHelpModal()">Close</button></div></div></div>
     
     <script>
+        // ============ SAFE DATE FORMATTING FUNCTIONS ============
+        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        function safeFormatDate(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleDateString();
+            }
+            // Handle regular Date object, string, or number
+            try {
+                return new Date(dateValue).toLocaleDateString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatDateTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleString();
+            }
+            try {
+                return new Date(dateValue).toLocaleString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleTimeString();
+            }
+            try {
+                return new Date(dateValue).toLocaleTimeString();
+            } catch (e) {
+                return 'Invalid Time';
+            }
+        }
+        
         let currentUser = null;
         let db = null;
         let unreadNotifications = 0;
@@ -269,13 +309,11 @@
         async function showNotifications() {
             if (!db || !currentUser) return;
             try {
-                // Removed .orderBy('createdAt', 'desc') to avoid index requirement
                 const snapshot = await db.collection('notifications')
                     .where('userId', '==', currentUser.uid)
                     .limit(20)
                     .get();
                 
-                // Sort on client side instead
                 let notifications = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -286,7 +324,6 @@
                     });
                 });
                 
-                // Sort manually by createdAt (newest first)
                 notifications.sort((a, b) => b.createdAt - a.createdAt);
                 
                 let html = '';
@@ -330,7 +367,7 @@
                                         </div>
                                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #666;">${escapeHtml(notif.message)}</p>
                                         <small style="color: #999;">
-                                            ${notif.createdAt ? notif.createdAt.toLocaleString() : 'Just now'}
+                                            ${notif.createdAt ? safeFormatDateTime(notif.createdAt) : 'Just now'}
                                         </small>
                                     </div>
                                 </div>
@@ -438,10 +475,21 @@
                 let reports = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
+                    // Handle both Firebase Timestamp and regular Date objects
+                    let createdAt;
+                    if (data.createdAt) {
+                        if (data.createdAt.toDate) {
+                            createdAt = data.createdAt.toDate();
+                        } else {
+                            createdAt = new Date(data.createdAt);
+                        }
+                    } else {
+                        createdAt = new Date();
+                    }
                     reports.push({ 
                         id: doc.id, 
                         ...data,
-                        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())
+                        createdAt: createdAt
                     });
                 });
                 
@@ -459,7 +507,7 @@
                         <div class="report-card-body">
                             <h4>${escapeHtml(report.incidentType || 'Unspecified')}</h4>
                             <p><i class="fas fa-map-marker-alt"></i> ${escapeHtml(report.location || 'Unknown')}</p>
-                            <p><i class="fas fa-calendar"></i> ${date.toLocaleDateString()}</p>
+                            <p><i class="fas fa-calendar"></i> ${safeFormatDate(report.createdAt)}</p>
                         </div>
                         <div class="report-card-footer">
                             <span class="status-badge status-${report.status || 'pending'}">${(report.status || 'pending').replace('_', ' ')}</span>
@@ -498,7 +546,7 @@
                     <div class="form-group"><label>Email</label><input type="email" value="${escapeHtml(data.email || '')}" readonly></div>
                     <div class="form-group"><label>Phone</label><input type="tel" value="${escapeHtml(data.phone || 'Not provided')}" readonly></div>
                     <div class="form-group"><label>Location</label><input type="text" value="${escapeHtml(data.location || 'Not set')}" readonly></div>
-                    <div class="form-group"><label>Member Since</label><input type="text" value="${data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toLocaleDateString() : new Date(data.createdAt).toLocaleDateString()) : 'N/A'}" readonly></div>
+                    <div class="form-group"><label>Member Since</label><input type="text" value="${safeFormatDate(data.createdAt)}" readonly></div>
                 `;
                 document.getElementById('profileModal').style.display = 'flex';
             } catch (error) {
@@ -588,14 +636,13 @@
                     
                     await loadNotificationCount();
                     
-                    // Set up real-time notification listener - removed .orderBy to avoid index requirement
+                    // Set up real-time notification listener
                     db.collection('notifications')
                         .where('userId', '==', user.uid)
                         .where('read', '==', false)
                         .onSnapshot((snapshot) => {
                             unreadNotifications = snapshot.size;
                             updateNotificationBadge();
-                            // Show toast for new notifications
                             snapshot.docChanges().forEach((change) => {
                                 if (change.type === 'added') {
                                     const notif = change.doc.data();
