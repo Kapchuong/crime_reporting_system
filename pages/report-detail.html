@@ -65,6 +65,46 @@
     </div>
     
     <script>
+        // ============ SAFE DATE FORMATTING FUNCTIONS ============
+        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        function safeFormatDate(dateValue) {
+            if (!dateValue) return 'N/A';
+            // Handle Firebase Timestamp
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleDateString();
+            }
+            // Handle regular Date object, string, or number
+            try {
+                return new Date(dateValue).toLocaleDateString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatDateTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleString();
+            }
+            try {
+                return new Date(dateValue).toLocaleString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        }
+        
+        function safeFormatTime(dateValue) {
+            if (!dateValue) return 'N/A';
+            if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+                return dateValue.toDate().toLocaleTimeString();
+            }
+            try {
+                return new Date(dateValue).toLocaleTimeString();
+            } catch (e) {
+                return 'Invalid Time';
+            }
+        }
+        
         let currentUser = null;
         
         function getReportId() { return new URLSearchParams(window.location.search).get('id'); }
@@ -74,11 +114,14 @@
             if (!reportId) { document.getElementById('reportContent').innerHTML = '<div class="error">Report ID not found</div>'; return; }
             
             try {
-                const reportDoc = await firebase.firestore().collection('reports').doc(reportId).get();
+                const db = firebase.firestore();
+                const reportDoc = await db.collection('reports').doc(reportId).get();
                 if (!reportDoc.exists) { document.getElementById('reportContent').innerHTML = '<div class="error">Report not found</div>'; return; }
                 
                 const report = { id: reportDoc.id, ...reportDoc.data() };
-                const timelineSnapshot = await firebase.firestore().collection('reports').doc(reportId).collection('timeline').orderBy('createdAt', 'desc').get();
+                
+                // Get timeline
+                const timelineSnapshot = await db.collection('reports').doc(reportId).collection('timeline').orderBy('createdAt', 'desc').get();
                 const timeline = [];
                 timelineSnapshot.forEach(doc => timeline.push({ id: doc.id, ...doc.data() }));
                 
@@ -90,21 +133,76 @@
         }
         
         function displayReportDetails(report, timeline) {
-            const date = report.createdAt ? report.createdAt.toDate() : new Date();
-            const incidentDate = report.incidentDate ? new Date(report.incidentDate) : null;
+            // Handle both Firebase Timestamp and regular Date objects for createdAt
+            let createdAt;
+            if (report.createdAt) {
+                if (report.createdAt.toDate) {
+                    createdAt = report.createdAt.toDate();
+                } else {
+                    createdAt = new Date(report.createdAt);
+                }
+            } else {
+                createdAt = new Date();
+            }
+            
+            // Handle incidentDate (could be Firebase Timestamp or regular Date)
+            let incidentDate = null;
+            if (report.incidentDate) {
+                if (report.incidentDate.toDate) {
+                    incidentDate = report.incidentDate.toDate();
+                } else {
+                    incidentDate = new Date(report.incidentDate);
+                }
+            }
             
             let evidenceHtml = '';
             if (report.evidence && report.evidence.length > 0) {
-                evidenceHtml = `<div class="report-section"><h2 class="section-title">Evidence</h2><div class="evidence-grid">` +
-                    report.evidence.map(e => `<div class="evidence-item" onclick="viewEvidence('${e.url}')">${e.type.startsWith('image/') ? `<img src="${e.url}" alt="Evidence">` : `<video><source src="${e.url}"></video><i class="fas fa-play" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: white; font-size: 2rem;"></i>`}</div>`).join('') +
-                    `</div></div>`;
+                evidenceHtml = `<div class="report-section">
+                    <h2 class="section-title">Evidence</h2>
+                    <div class="evidence-grid">
+                        ${report.evidence.map(e => {
+                            // Check if evidence has valid URL
+                            if (!e.url) return '';
+                            const isImage = e.type && e.type.startsWith('image/');
+                            return `<div class="evidence-item" onclick="viewEvidence('${e.url}')">
+                                ${isImage ? `<img src="${e.url}" alt="Evidence">` : `<video><source src="${e.url}"></video><i class="fas fa-play" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: white; font-size: 2rem;"></i>`}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            }
+            
+            // Build timeline HTML with safe date formatting
+            let timelineHtml = '';
+            if (timeline.length > 0) {
+                timelineHtml = `<div class="report-section">
+                    <h2 class="section-title">Timeline</h2>
+                    <div class="timeline">
+                        ${timeline.map(item => {
+                            let itemDate = 'N/A';
+                            if (item.createdAt) {
+                                if (item.createdAt.toDate) {
+                                    itemDate = item.createdAt.toDate().toLocaleString();
+                                } else {
+                                    itemDate = new Date(item.createdAt).toLocaleString();
+                                }
+                            }
+                            return `<div class="timeline-item">
+                                <div class="timeline-date">${itemDate}</div>
+                                <div><strong>${escapeHtml(item.type || 'Update')}</strong></div>
+                                ${item.note ? `<div>${escapeHtml(item.note)}</div>` : ''}
+                                ${item.officerName ? `<div><small>By: ${escapeHtml(item.officerName)}</small></div>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
             }
             
             const content = `
                 <div class="report-header">
                     <h1 class="report-title">Report #${report.id.slice(0, 8)}</h1>
                     <div class="report-meta">
-                        <span><i class="fas fa-calendar"></i> ${date.toLocaleString()}</span>
+                        <span><i class="fas fa-calendar"></i> ${safeFormatDateTime(createdAt)}</span>
                         <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(report.location || 'Unknown')}</span>
                         <span class="status-badge status-${report.status || 'pending'}">${(report.status || 'pending').toUpperCase().replace('_', ' ')}</span>
                         <span class="priority-badge priority-${report.priority || 'low'}">${(report.priority || 'low').toUpperCase()}</span>
@@ -114,10 +212,26 @@
                 <div class="report-section">
                     <h2 class="section-title">Incident Details</h2>
                     <div class="detail-grid">
-                        <div class="detail-item"><div class="detail-label">Incident Type</div><div class="detail-value">${escapeHtml(report.incidentType || 'N/A')}</div></div>
-                        <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.location || 'N/A')}</div></div>
-                        <div class="detail-item"><div class="detail-label">Date & Time</div><div class="detail-value">${incidentDate ? incidentDate.toLocaleString() : 'N/A'}</div></div>
-                        <div class="detail-item"><div class="detail-label">Reporter</div><div class="detail-value">${escapeHtml(report.userName || 'Anonymous')}</div></div>
+                        <div class="detail-item">
+                            <div class="detail-label">Incident Type</div>
+                            <div class="detail-value">${escapeHtml(report.incidentType || 'N/A')}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">${escapeHtml(report.location || 'N/A')}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Date & Time</div>
+                            <div class="detail-value">${incidentDate ? incidentDate.toLocaleString() : 'N/A'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Reporter</div>
+                            <div class="detail-value">${escapeHtml(report.userName || 'Anonymous')}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Assigned To</div>
+                            <div class="detail-value">${escapeHtml(report.assignedTo || 'Not assigned')}</div>
+                        </div>
                     </div>
                 </div>
                 
@@ -126,19 +240,21 @@
                     <p>${escapeHtml(report.description || 'No description provided')}</p>
                 </div>
                 
-                ${report.suspectInfo ? `<div class="report-section"><h2 class="section-title">Suspect Information</h2><p>${escapeHtml(report.suspectInfo)}</p></div>` : ''}
+                ${report.suspectInfo ? `<div class="report-section">
+                    <h2 class="section-title">Suspect Information</h2>
+                    <p>${escapeHtml(report.suspectInfo)}</p>
+                </div>` : ''}
                 
                 ${evidenceHtml}
                 
-                ${timeline.length > 0 ? `<div class="report-section"><h2 class="section-title">Timeline</h2><div class="timeline">` + timeline.map(item => `
-                    <div class="timeline-item"><div class="timeline-date">${item.createdAt ? item.createdAt.toDate().toLocaleString() : 'N/A'}</div>
-                    <div><strong>${escapeHtml(item.type || 'Update')}</strong></div>${item.note ? `<div>${escapeHtml(item.note)}</div>` : ''}
-                    ${item.officerName ? `<div><small>By: ${escapeHtml(item.officerName)}</small></div>` : ''}</div>`).join('') + `</div></div>` : ''}
+                ${timelineHtml}
             `;
             document.getElementById('reportContent').innerHTML = content;
         }
         
-        window.viewEvidence = function(url) { window.open(url, '_blank'); };
+        window.viewEvidence = function(url) { 
+            window.open(url, '_blank'); 
+        };
         
         function goBack() {
             const userRole = localStorage.getItem('userRole');
@@ -147,16 +263,37 @@
             else window.location.href = 'citizen-dashboard.html';
         }
         
-        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        function escapeHtml(text) { 
+            if (!text) return ''; 
+            const div = document.createElement('div'); 
+            div.textContent = text; 
+            return div.innerHTML; 
+        }
         
         (async function init() {
-            if (!window.firebase || !firebase.auth) { document.getElementById('reportContent').innerHTML = '<div class="error">Firebase not initialized</div>'; return; }
+            if (!window.firebase || !firebase.auth) { 
+                document.getElementById('reportContent').innerHTML = '<div class="error">Firebase not initialized</div>'; 
+                return; 
+            }
+            
+            const db = firebase.firestore();
+            
             firebase.auth().onAuthStateChanged(async (user) => {
-                if (!user) { window.location.href = 'login.html'; return; }
+                if (!user) { 
+                    window.location.href = 'login.html'; 
+                    return; 
+                }
                 currentUser = user;
-                const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
-                if (userDoc.exists) localStorage.setItem('userRole', userDoc.data().role);
-                await loadReportDetails();
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        localStorage.setItem('userRole', userDoc.data().role);
+                    }
+                    await loadReportDetails();
+                } catch (error) {
+                    console.error('Error getting user role:', error);
+                    await loadReportDetails();
+                }
             });
         })();
     </script>
