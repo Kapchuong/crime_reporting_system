@@ -1,6 +1,5 @@
 // functions/sendNotification.js
 export async function onRequest(context) {
-    // Handle CORS preflight request
     if (context.request.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
@@ -22,8 +21,7 @@ export async function onRequest(context) {
         const { reportId, incidentType, location, priority, description, policeContacts } = body;
         
         const results = [];
-        
-        // Get DKIM environment variables (if configured)
+        // Get DKIM environment variables
         const DKIM_PRIVATE_KEY = context.env.DKIM_PRIVATE_KEY;
         const DKIM_SELECTOR = context.env.DKIM_SELECTOR || 'default';
         const DOMAIN = context.env.DOMAIN || 'kapchuong.dpdns.org';
@@ -31,8 +29,7 @@ export async function onRequest(context) {
         for (const police of policeContacts) {
             if (police.email) {
                 console.log(`Sending email to ${police.email}...`);
-                
-                // Build email payload - DKIM at ROOT level (not inside personalizations)
+                // Build email payload (DKIM at ROOT level)
                 const emailPayload = {
                     personalizations: [{
                         to: [{ email: police.email }]
@@ -44,8 +41,6 @@ export async function onRequest(context) {
                         value: `New ${priority} report: ${incidentType} at ${location}\n\nReport ID: ${reportId}\nDescription: ${description || 'No description provided'}`
                     }]
                 };
-                
-                // Add DKIM signing at the ROOT level if private key is available
                 if (DKIM_PRIVATE_KEY) {
                     emailPayload.dkim = {
                         privateKey: DKIM_PRIVATE_KEY,
@@ -65,9 +60,9 @@ export async function onRequest(context) {
                 
                 if (emailResponse.ok) {
                     results.push({ type: 'email', to: police.email, status: 'sent' });
-                    console.log(`✅ Email sent to ${police.email}`);
+                    console.log(`Email sent to ${police.email}`);
                 } else {
-                    console.error(`❌ Email failed to ${police.email}: ${responseText}`);
+                    console.error(`Email failed to ${police.email}: ${responseText}`);
                     results.push({ type: 'email', to: police.email, status: 'failed', error: responseText });
                 }
             }
