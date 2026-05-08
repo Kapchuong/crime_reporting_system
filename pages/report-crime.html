@@ -13,7 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     
-    <!-- Cloudinary Widget (No CORS Issues!) -->
+    <!-- Cloudinary Widget -->
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     
     <style>
@@ -110,7 +110,7 @@
         }
         .keyword-detection-notice i { color: #1976d2; margin-right: 8px; }
         
-        /* Cloudinary Upload Styles */
+        /* Cloudinary upload styles */
         .btn-cloudinary {
             background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
             color: white;
@@ -269,7 +269,7 @@
                             <textarea id="suspectInfo" rows="3" placeholder="Description of suspect(s), clothing, vehicle, etc."></textarea>
                         </div>
                         
-                        <!-- Cloudinary Evidence Upload (No CORS Issues!) -->
+                        <!-- Cloudinary Evidence Upload -->
                         <div class="form-group">
                             <label>Evidence (Photos/Videos)</label>
                             <button type="button" class="btn-cloudinary" id="cloudinaryUploadBtn">
@@ -303,7 +303,7 @@
     </div>
     
     <script>
-        // ============ Firebase Configuration ============
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCr9f1gTrP5nTEJ9RHg-vIpEQQRH_Dm96E",
             authDomain: "crime-reporting-system-939aa.firebaseapp.com",
@@ -313,7 +313,7 @@
             appId: "1:890706417373:web:22b6aaf7f074aec231ad34"
         };
         
-        // Initialize Firebase if not already initialized
+        // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -324,8 +324,8 @@
         let currentUser = null;
         let uploadedFiles = []; // Store Cloudinary uploaded file URLs
         
-        // ============ KEYWORD DETECTION ALGORITHM ============
-        // High Priority Keywords (score: +40 each, max 100)
+        // Keyword detection algorithm
+        
         const HIGH_PRIORITY_KEYWORDS = [
             'weapon', 'gun', 'rifle', 'pistol', 'shotgun', 'firearm',
             'knife', 'blade', 'machete', 'sword',
@@ -338,7 +338,7 @@
             'active shooter', 'mass shooting'
         ];
         
-        // Medium Priority Keywords (score: +20 each, max 100)
+        // Medium Priority Keywords
         const MEDIUM_PRIORITY_KEYWORDS = [
             'assault', 'beating', 'fight', 'brawl', 'confrontation',
             'robbery', 'mugging', 'armed robbery',
@@ -352,7 +352,7 @@
             'screaming', 'distress'
         ];
         
-        // Low Priority Keywords (score: -10, minimum 0)
+        // Low Priority Keywords
         const LOW_PRIORITY_KEYWORDS = [
             'suspicious', 'unusual', 'strange',
             'noise', 'loud sound', 'disturbance',
@@ -393,7 +393,7 @@
                 }
             }
             
-            // Check medium priority keywords (if not already max)
+            // Check medium priority keywords
             if (score < 100) {
                 for (const keyword of MEDIUM_PRIORITY_KEYWORDS) {
                     if (text.includes(keyword.toLowerCase())) {
@@ -407,7 +407,7 @@
                 }
             }
             
-            // Check low priority keywords (reduce score)
+            // Check low priority keywords
             for (const keyword of LOW_PRIORITY_KEYWORDS) {
                 if (text.includes(keyword.toLowerCase())) {
                     score -= 10;
@@ -515,7 +515,7 @@
             };
         }
         
-        // ============ Cloudinary Configuration ============
+        // Cloudinary Configuration
         const CLOUDINARY_CLOUD_NAME = 'dqw0gkurl';
         const CLOUDINARY_UPLOAD_PRESET = 'crime_reports_preset';
         
@@ -556,7 +556,7 @@
                         });
                         
                         updateCloudinaryFileList();
-                        showToast(`✓ File "${fileName}" uploaded successfully!`, 'success');
+                        showToast(`File "${fileName}" uploaded successfully!`, 'success');
                         console.log('File uploaded:', fileUrl);
                     }
                     
@@ -620,7 +620,7 @@
         async function sendNotificationsViaCloudflare(reportId, reportData) {
             try {
                 const cloudflareUrl = 'https://crime-reporting-system.pages.dev/sendNotification';
-                console.log(`📡 Calling Cloudflare function at: ${cloudflareUrl}`);
+                console.log(`Calling Cloudflare function at: ${cloudflareUrl}`);
                 
                 const policeSnapshot = await db.collection('users').where('role', '==', 'police').get();
                 const policeContacts = [];
@@ -636,7 +636,7 @@
                     return;
                 }
                 
-                console.log(`📋 Notifying ${policeContacts.length} police officers via Cloudflare`);
+                console.log(`Notifying ${policeContacts.length} police officers via Cloudflare`);
                 
                 const response = await fetch(cloudflareUrl, {
                     method: 'POST',
@@ -652,10 +652,10 @@
                 });
                 
                 const result = await response.json();
-                console.log('📧 Cloudflare notification result:', result);
+                console.log('Cloudflare notification result:', result);
                 
             } catch (error) {
-                console.error('❌ Error calling Cloudflare function:', error);
+                console.error('Error calling Cloudflare function:', error);
             }
         }
         
@@ -854,7 +854,7 @@
                     
                     await sendNotificationsViaCloudflare(reportId, reportData);
                     
-                    showToast(`✓ Report submitted successfully!\nReference: ${reportId.slice(0, 8).toUpperCase()}\n📎 ${uploadedFiles.length} evidence file(s)\n🚨 Priority: ${priority.toUpperCase()}`, 'success');
+                    showToast(`Report submitted successfully!\nReference: ${reportId.slice(0, 8).toUpperCase()}\n📎 ${uploadedFiles.length} evidence file(s)\n🚨 Priority: ${priority.toUpperCase()}`, 'success');
                     
                     // Clear form
                     reportForm.reset();
@@ -909,7 +909,7 @@
             dateTimeInput.value = now.toISOString().slice(0, 16);
         }
         
-        console.log('✅ Page loaded! Keyword detection active.');
+        console.log('Page loaded! Keyword detection active.');
     </script>
 </body>
 </html>
