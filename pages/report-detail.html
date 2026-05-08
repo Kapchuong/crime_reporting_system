@@ -63,7 +63,7 @@
     </div>
     
     <script>
-        // ============ FIREBASE CONFIGURATION (ADDED DIRECTLY) ============
+        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCr9f1gTrP5nTEJ9RHg-vIpEQQRH_Dm96E",
             authDomain: "crime-reporting-system-939aa.firebaseapp.com",
@@ -73,13 +73,13 @@
             appId: "1:890706417373:web:22b6aaf7f074aec231ad34"
         };
         
-        // Initialize Firebase if not already initialized
+        // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
             console.log('Firebase initialized successfully');
         }
         
-        // ============ SAFE DATE FORMATTING FUNCTIONS ============
+        // Safe date formatting functions
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
