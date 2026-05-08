@@ -1,6 +1,4 @@
-// auth.js - Complete authentication module
-
-// Wait for Firebase to be ready
+// authentication of the firebase
 function waitForFirebase() {
     return new Promise((resolve) => {
         if (window.firebase && window.firebase.auth) {
