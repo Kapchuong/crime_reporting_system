@@ -229,10 +229,9 @@
             <div class="modal-footer"><button class="btn-view" onclick="closeCloseReportModal()">Cancel</button><button class="btn-close" id="confirmCloseBtn">Close Report</button></div>
         </div>
     </div>
-    
+     
     <script>
-        // ============ SAFE DATE FORMATTING FUNCTIONS ============
-        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        // Safe date formatting functions
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
             // Handle Firebase Timestamp
@@ -278,7 +277,7 @@
         let db = null;
         let unreadNotifications = 0;
         
-        // ============ NOTIFICATION FUNCTIONS ============
+        // Notification functions
         
         async function createNotification(userId, title, message, type = 'info', reportId = null) {
             if (!db) return;
@@ -457,7 +456,7 @@
                 const message = `New ${report.priority.toUpperCase()} priority report: ${report.incidentType} at ${report.location}`;
                 await createNotification(currentUser?.uid, `New ${report.priority.toUpperCase()} Priority Report`, message, report.priority === 'high' ? 'error' : 'info', report.id);
                 if (report.priority === 'high') {
-                    showToast(`🚨 NEW HIGH PRIORITY REPORT: ${report.incidentType} at ${report.location}`, 'error');
+                    showToast(`NEW HIGH PRIORITY REPORT: ${report.incidentType} at ${report.location}`, 'error');
                 } else {
                     showToast(`New report: ${report.incidentType} at ${report.location}`, 'info');
                 }
@@ -466,7 +465,7 @@
             }
         }
         
-        // ============ CLOSE REPORT FUNCTIONS ============
+        // Close report functions
         
         function openCloseReportModal(reportId) {
             currentReportId = reportId;
@@ -553,7 +552,7 @@
             await loadReports();
         }
         
-        // ============ MAIN DASHBOARD FUNCTIONS ============
+        // Main dashboard fucntions
         
         async function loadDashboard() {
             document.getElementById('reportsTitle').innerHTML = 'Recent Reports';
