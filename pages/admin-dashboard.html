@@ -440,9 +440,6 @@
         const db = window.db || firebase.firestore();
         
         console.log('Firebase initialized successfully');
-        
-        // ============= HELPER FUNCTIONS FOR DATE FORMATTING (FIXED) =============
-        // This safely handles BOTH Firebase Timestamp AND regular Date objects
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
             // Handle Firebase Timestamp (has toDate method)
@@ -455,37 +452,30 @@
         
         function safeFormatDateTime(dateValue) {
             if (!dateValue) return 'N/A';
-            // Handle Firebase Timestamp
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleString();
             }
-            // Handle regular Date object or string
             return new Date(dateValue).toLocaleString();
         }
         
         function safeFormatTime(dateValue) {
             if (!dateValue) return 'N/A';
-            // Handle Firebase Timestamp
             if (dateValue.toDate && typeof dateValue.toDate === 'function') {
                 return dateValue.toDate().toLocaleTimeString();
             }
-            // Handle regular Date object or string
             return new Date(dateValue).toLocaleTimeString();
         }
-        
-        // Legacy functions kept for compatibility (now use safe versions)
         function formatDate(t) { return safeFormatDate(t); }
         function formatDateTime(t) { return safeFormatDateTime(t); }
         function formatTime(t) { return safeFormatTime(t); }
-        
-        // ============= GLOBAL VARIABLES =============
+        // Global variables
         let currentUser = null;
         let editUserId = null;
         let currentFilter = 'all';
         let currentUserRoleFilter = 'all';
         let reportsChart = null;
         
-        // ============= HELPER FUNCTIONS =============
+        // Helper functions
         function escapeHtml(text) { 
             if (!text) return ''; 
             return text.replace(/[&<>]/g, function(m) { 
@@ -528,7 +518,7 @@
             document.querySelector('.sidebar').classList.toggle('active'); 
         }
         
-        // ============= TOGGLE POLICE FIELDS =============
+        // Toggle police field
         function toggleAddUserRoleFields() {
             const role = document.getElementById('newRole').value;
             const policeFields = document.getElementById('addPoliceFields');
@@ -545,7 +535,7 @@
             }
         }
         
-        // ============= SECTION NAVIGATION =============
+        // Navigating fields for sections
         function showSection(sectionId) {
             document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
             const targetSection = document.getElementById(sectionId + '-section');
@@ -583,7 +573,7 @@
             }
         }
         
-        // ============= DASHBOARD STATS =============
+        // Status of the dashboard
         async function loadSystemStats() {
             try {
                 const usersSnapshot = await db.collection('users').get();
@@ -624,7 +614,7 @@
                 });
         }
         
-        // ============= USER MANAGEMENT =============
+        // User management
         function filterUsersByRole() {
             currentUserRoleFilter = document.getElementById('userRoleFilter').value;
             loadUsers();
@@ -899,7 +889,7 @@
         }
         
         async function deleteUser(userId) {
-            if (!confirm('⚠️ Are you sure you want to permanently delete this user?')) return;
+            if (!confirm('Are you sure you want to permanently delete this user?')) return;
             const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
             if (confirmation !== 'DELETE') {
                 showToast('Deletion cancelled', 'info');
@@ -914,7 +904,7 @@
             }
         }
         
-        // ============= REPORTS =============
+        // Reports
         async function loadReports() {
             try {
                 const snapshot = await db.collection('reports').orderBy('createdAt', 'desc').limit(50).get();
@@ -955,7 +945,7 @@
             window.location.href = `report-detail.html?id=${reportId}`; 
         }
         
-        // ============= ANALYTICS =============
+        // Analytics
         async function loadAnalytics() {
             try {
                 const snapshot = await db.collection('reports').get();
@@ -1000,7 +990,7 @@
             }
         }
         
-        // ============= SYSTEM LOGS =============
+        // System Logs
         async function loadSystemLogs() {
             try {
                 const snapshot = await db.collection('systemLogs').orderBy('timestamp', 'desc').limit(100).get();
@@ -1029,7 +1019,7 @@
             showToast('Logs refreshed', 'success'); 
         }
         
-        // ============= SETTINGS =============
+        // Settings
         function loadSettings() {
             const saved = localStorage.getItem('systemSettings');
             if (saved) {
@@ -1056,7 +1046,7 @@
             showToast('Settings saved!', 'success');
         }
         
-        // ============= SEARCH FUNCTION =============
+        // Search function
         const searchInput = document.getElementById('searchUsers');
         if (searchInput) {
             searchInput.addEventListener('input', async (e) => {
@@ -1098,7 +1088,7 @@
             });
         }
         
-        // ============= AUTHENTICATION CHECK =============
+        // Authentication check
         auth.onAuthStateChanged(async (user) => {
             console.log('Auth state changed. User:', user ? user.email : 'No user');
             
@@ -1159,7 +1149,7 @@
             }
         });
         
-        // ============= CLOSE MODALS ON OUTSIDE CLICK =============
+        // Close modals on outside click
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
@@ -1170,7 +1160,7 @@
             }
         };
         
-        // ============= CREATE DEFAULT ADMIN IF NEEDED =============
+        // Create default Admin if needed
         async function createDefaultAdminIfNeeded() {
             try {
                 const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
