@@ -199,8 +199,7 @@
     <div id="helpModal" class="modal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-question-circle"></i> Help & Support</h3><button class="modal-close" onclick="closeHelpModal()">&times;</button></div><div class="modal-body"><h4>How to Report a Crime</h4><p>Click on "Report Crime" in the sidebar and fill out the form.</p><h4>Emergency Reporting</h4><p>For emergencies, click the red EMERGENCY banner or call 999 directly.</p><h4>Tracking Your Report</h4><p>All your reports are listed in "My Reports". Click on any report to see its status.</p><h4>Contact Support</h4><p>Email: support@kiryandongo.go.ug<br>Phone: +256 700 123 456</p></div><div class="modal-footer"><button class="btn-standard" onclick="closeHelpModal()">Close</button></div></div></div>
     
     <script>
-        // ============ SAFE DATE FORMATTING FUNCTIONS ============
-        // These safely handle BOTH Firebase Timestamp AND regular Date objects (from Cloudinary)
+        // Safe date formatting functions
         function safeFormatDate(dateValue) {
             if (!dateValue) return 'N/A';
             // Handle Firebase Timestamp
@@ -261,7 +260,7 @@
             }
         }
         
-        // ============ NOTIFICATION FUNCTIONS ============
+        // Notification functions
         
         async function createNotification(userId, title, message, type = 'info', reportId = null) {
             if (!db) return;
@@ -434,7 +433,7 @@
             }
         }
         
-        // ============ MAIN DASHBOARD FUNCTIONS ============
+        // Main dashboard functions
         
         async function loadDashboardData() {
             if (!currentUser || !db) return;
