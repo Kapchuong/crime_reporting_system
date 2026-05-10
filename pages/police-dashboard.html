@@ -342,9 +342,9 @@
                 
                 notifications.sort((a, b) => b.createdAt - a.createdAt);
                 
-                let html = '';
+                let notificationItemsHtml = '';
                 if (notifications.length === 0) {
-                    html = `
+                    notificationItemsHtml = `
                         <div style="text-align: center; padding: 2rem;">
                             <i class="fas fa-bell-slash" style="font-size: 3rem; color: #ccc;"></i>
                             <p style="margin-top: 1rem; color: #666;">No notifications yet</p>
@@ -354,37 +354,33 @@
                     notifications.forEach(notif => {
                         const notifId = notif.id;
                         const isRead = notif.read || false;
+                        const notifDate = notif.createdAt;
                         
-                        let icon = 'fa-info-circle';
-                        let color = '#2196F3';
+                        let bgColor = !isRead ? '#f0f7ff' : '#f9f9f9';
+                        let borderColor = '#2196F3';
                         if (notif.type === 'warning' || notif.type === 'error') {
-                            icon = 'fa-exclamation-triangle';
-                            color = '#F44336';
+                            borderColor = '#F44336';
                         } else if (notif.type === 'success') {
-                            icon = 'fa-check-circle';
-                            color = '#4CAF50';
+                            borderColor = '#4CAF50';
                         }
                         
-                        html += `
+                        notificationItemsHtml += `
                             <div class="notification-item" style="
-                                padding: 12px; 
-                                border-left: 4px solid ${color}; 
-                                background: ${!isRead ? '#f0f7ff' : '#f9f9f9'}; 
-                                margin-bottom: 10px; 
-                                border-radius: 4px;
+                                padding: 12px 15px;
+                                border-left: 4px solid ${borderColor};
+                                background: ${bgColor};
+                                margin-bottom: 8px;
+                                border-radius: 8px;
                                 cursor: pointer;
                             " onclick="markNotificationRead('${notifId}')">
-                                <div style="display: flex; gap: 12px; align-items: start;">
-                                    <i class="fas ${icon}" style="color: ${color}; margin-top: 2px;"></i>
+                                <div style="display: flex; gap: 12px; align-items: flex-start;">
                                     <div style="flex: 1;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-wrap: wrap; gap: 5px;">
                                             <strong style="color: #333;">${escapeHtml(notif.title)}</strong>
-                                            ${!isRead ? '<span style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">NEW</span>' : ''}
+                                            ${!isRead ? '<span style="background: #dc3545; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">NEW</span>' : ''}
                                         </div>
-                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #666;">${escapeHtml(notif.message)}</p>
-                                        <small style="color: #999;">
-                                            ${notif.createdAt ? safeFormatDateTime(notif.createdAt) : 'Just now'}
-                                        </small>
+                                        <p style="margin: 0 0 5px 0; font-size: 13px; color: #666;">${escapeHtml(notif.message)}</p>
+                                        <small style="color: #999;">${notifDate ? safeFormatDateTime(notifDate) : 'Just now'}</small>
                                     </div>
                                 </div>
                             </div>
@@ -392,21 +388,64 @@
                     });
                 }
                 
+                // Create styled modal with border box design
                 const modal = document.createElement('div');
                 modal.className = 'modal';
                 modal.style.display = 'flex';
+                modal.style.alignItems = 'center';
+                modal.style.justifyContent = 'center';
                 modal.innerHTML = `
-                    <div class="modal-content" style="max-width: 500px;">
-                        <div class="modal-header">
-                            <h3><i class="fas fa-bell"></i> Notifications</h3>
-                            <button class="modal-close" onclick="this.closest('.modal').remove();">&times;</button>
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        max-width: 450px;
+                        width: 90%;
+                        max-height: 80vh;
+                        overflow: hidden;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        font-family: monospace;
+                    ">
+                        <div style="
+                            background: #f8f9fa;
+                            padding: 12px 20px;
+                            border-bottom: 1px solid #ddd;
+                            font-weight: bold;
+                            font-size: 16px;">
+                            New Report
                         </div>
-                        <div class="modal-body" style="max-height: 450px; overflow-y: auto;">
-                            ${html}
+                        
+                        <div style="height: 1px; background: #ddd;"></div>
+                        
+                        <div style="padding: 20px; max-height: 60vh; overflow-y: auto;">
+                            ${notificationItemsHtml}
                         </div>
-                        <div class="modal-footer">
-                            <button class="btn-view" onclick="markAllNotificationsRead(); this.closest('.modal').remove();">Mark All Read</button>
-                            <button class="btn-update" onclick="this.closest('.modal').remove();">Close</button>
+                        
+                        <div style="
+                            padding: 12px 20px;
+                            border-top: 1px solid #ddd;
+                            background: #f8f9fa;
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 10px;
+                        ">
+                            <button onclick="markAllNotificationsRead(); this.closest('.modal').remove();" style="
+                                background: #007bff;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">Mark All Read</button>
+                            <button onclick="this.closest('.modal').remove();" style="
+                                background: #6c757d;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">Dismiss</button>
                         </div>
                     </div>
                 `;
@@ -453,16 +492,86 @@
         async function notifyNewReport(report) {
             if (!db) return;
             try {
-                const message = `New ${report.priority.toUpperCase()} priority report: ${report.incidentType} at ${report.location}`;
+                const message = `New ${report.priority.toUpperCase()} Priority Report: ${report.incidentType} at ${report.location}`;
                 await createNotification(currentUser?.uid, `New ${report.priority.toUpperCase()} Priority Report`, message, report.priority === 'high' ? 'error' : 'info', report.id);
-                if (report.priority === 'high') {
-                    showToast(`NEW HIGH PRIORITY REPORT: ${report.incidentType} at ${report.location}`, 'error');
-                } else {
-                    showToast(`New report: ${report.incidentType} at ${report.location}`, 'info');
-                }
+                
+                // Show styled toast notification
+                showStyledNotification(message, report.id, report.priority);
+                
             } catch (error) {
                 console.error('Error notifying about report:', error);
             }
+        }
+        
+        function showStyledNotification(message, reportId, priority) {
+            const notification = document.createElement('div');
+            const priorityColor = priority === 'high' ? '#dc3545' : (priority === 'medium' ? '#ff9800' : '#28a745');
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 340px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                z-index: 10000;
+                font-family: monospace;
+                animation: slideUp 0.3s ease;
+            `;
+            notification.innerHTML = `
+                <div style="
+                    background: #f8f9fa;
+                    padding: 10px 15px;
+                    border-bottom: 1px solid #ddd;
+                    font-weight: bold;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                ">
+                    <span>New Report</span>
+                    <span style="font-size: 18px; cursor: pointer;" onclick="this.closest('div').closest('div').remove();">&times;</span>
+                </div>
+                <div style="height: 1px; background: #ddd;"></div>
+                <div style="padding: 15px;">
+                    <div style="border-left: 3px solid ${priorityColor}; padding-left: 10px;">
+                        <strong>${escapeHtml(message)}</strong>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; color: #999;">${new Date().toLocaleString()}</div>
+                </div>
+                <div style="
+                    padding: 10px 15px;
+                    border-top: 1px solid #ddd;
+                    background: #f8f9fa;
+                    display: flex;
+                    gap: 10px;
+                    justify-content: flex-end;
+                ">
+                    <button onclick="window.location.href='report-detail.html?id=${reportId}'" style="
+                        background: #007bff;
+                        color: white;
+                        border: none;
+                        padding: 5px 12px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                    ">View Report</button>
+                    <button onclick="this.closest('div').closest('div').remove();" style="
+                        background: #6c757d;
+                        color: white;
+                        border: none;
+                        padding: 5px 12px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                    ">Dismiss</button>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Auto remove after 10 seconds
+            setTimeout(() => {
+                if (notification.parentNode) notification.remove();
+            }, 10000);
         }
         
         // Close report functions
@@ -667,8 +776,8 @@
                         ${!isClosed ? `<button class="btn-update" onclick="openStatusModal('${report.id}')"><i class="fas fa-edit"></i></button>` : ''}
                         ${!isClosed ? `<button class="btn-assign" onclick="assignReport('${report.id}')"><i class="fas fa-user-plus"></i></button>` : ''}
                         ${!isClosed ? `<button class="btn-close" onclick="openCloseReportModal('${report.id}')"><i class="fas fa-archive"></i> Close</button>` : '<span style="color:#666; font-size:11px;">Closed</span>'}
-                     </nav>
-                </tr>`;
+                     </td>
+                 </tr>`;
             }).join('');
         }
         
